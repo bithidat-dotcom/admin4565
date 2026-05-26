@@ -1,0 +1,6 @@
+{
+  "name": "Bazer bd Admin",
+  "description": "Secure Admin Dashboard for Bazer_bd.com eCommerce platform, featuring real-time order tracking and product management.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
