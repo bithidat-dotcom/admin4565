@@ -11,6 +11,7 @@ export default function Header({ title, onAction, actionLabel }: HeaderProps) {
   return (
     <header className="h-[72px] bg-white border-b border-slate-200 px-8 flex items-center justify-between sticky top-0 z-30">
       <div className="flex items-center gap-10 flex-1">
+        <img src="https://i.pinimg.com/1200x/2e/d3/45/2ed34552d98817c21168d0fbeb67bcc0.jpg" alt="Logo" className="w-8 h-8 rounded-full" />
         <h2 className="text-sm font-black text-slate-900 uppercase tracking-[0.2em] hidden lg:block">{title}</h2>
         
         <div className="flex items-center gap-3 bg-slate-50 border border-slate-200/60 px-4 py-2.5 rounded-xl w-full max-w-sm group focus-within:ring-4 focus-within:ring-brand/5 focus-within:border-brand/30 transition-all duration-300">

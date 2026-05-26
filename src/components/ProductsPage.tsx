@@ -97,6 +97,19 @@ export default function ProductsPage() {
     }
   };
 
+  const handleDeleteAll = async () => {
+    if (!window.confirm('Are you sure you want to delete ALL products? This action cannot be undone.')) return;
+    try {
+      // NOTE: This assumes RLS policies allow deleting all rows.
+      const { error } = await supabase.from('products').delete().neq('id', 'non-existent-id-to-remove-all');
+      if (error) throw error;
+      setProducts([]);
+    } catch (err) {
+      console.error('Error deleting all products:', err);
+      alert('Failed to delete all products');
+    }
+  };
+
   const addExtraImage = () => {
     if (!newImageUrl) return;
     setFormData(prev => ({ ...prev, images: [...prev.images, newImageUrl] }));
@@ -155,6 +168,14 @@ export default function ProductsPage() {
         onAction={handleOpenAddModal} 
         actionLabel="New Product" 
       />
+      <div className="px-8 mt-4">
+        <button
+          onClick={handleDeleteAll}
+          className="px-4 py-2 bg-red-100 text-red-600 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-red-200 transition-colors"
+        >
+          Delete All Products
+        </button>
+      </div>
 
       <main className="p-8 max-w-[1240px]">
         {loading ? (

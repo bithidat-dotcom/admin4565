@@ -63,7 +63,7 @@ export default function OrdersPage() {
       const { data, error } = await supabase
         .from('orders')
         .select('*')
-        .neq('status', 'completed')
+        .in('status', ['pending', 'confirmed'])
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -126,11 +126,11 @@ export default function OrdersPage() {
     }
   };
 
-  const handleDeleteOrder = async (id: string) => {
-    if (!window.confirm('Are you sure you want to permanently delete this order?')) return;
+  const handleCancelOrder = async (id: string) => {
+    if (!window.confirm('Are you sure you want to cancel this order?')) return;
     setDeletingId(id);
     try {
-      const { error } = await supabase.from('orders').delete().eq('id', id);
+      const { error } = await supabase.from('orders').update({ status: 'cancelled' }).eq('id', id);
       if (error) console.error(error);
       
       setOrders(orders.filter(o => o.id !== id));
@@ -138,7 +138,7 @@ export default function OrdersPage() {
       newSelection.delete(id);
       setSelectedOrders(newSelection);
     } catch (err) {
-      console.error('Error deleting order:', err);
+      console.error('Error cancelling order:', err);
     } finally {
       setDeletingId(null);
     }
@@ -380,7 +380,7 @@ export default function OrdersPage() {
                                   Confirm Order
                                 </button>
                                 <button
-                                  onClick={() => handleDeleteOrder(order.id)}
+                                  onClick={() => handleCancelOrder(order.id)}
                                   disabled={deletingId === order.id}
                                   className="w-full px-6 py-2 rounded-lg font-bold uppercase tracking-widest text-[10px] transition-all bg-red-50 text-red-500 hover:bg-red-100 flex items-center justify-center gap-2 disabled:opacity-50"
                                 >
@@ -406,7 +406,7 @@ export default function OrdersPage() {
                                     Mark Pending
                                   </button>
                                   <button
-                                    onClick={() => handleDeleteOrder(order.id)}
+                                    onClick={() => handleCancelOrder(order.id)}
                                     disabled={deletingId === order.id}
                                     className="flex-none px-4 py-2 rounded-lg font-bold text-red-500 transition-all bg-red-50 hover:bg-red-100 flex items-center justify-center disabled:opacity-50"
                                     title="Cancel Order"

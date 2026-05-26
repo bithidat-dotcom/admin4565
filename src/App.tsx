@@ -1,15 +1,33 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import ProductsPage from './components/ProductsPage';
 import OrdersPage from './components/OrdersPage';
 import HistoryPage from './components/HistoryPage';
 import BannersPage from './components/BannersPage';
+import LoginPage from './components/LoginPage';
 import { View } from './types';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function App() {
   const [currentView, setCurrentView] = useState<View>('dashboard');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    const authStatus = localStorage.getItem('isAdminAuthenticated');
+    if (authStatus === 'true') {
+      setIsAuthenticated(true);
+    }
+  }, []);
+
+  const handleLogin = () => {
+    setIsAuthenticated(true);
+    localStorage.setItem('isAdminAuthenticated', 'true');
+  };
+
+  if (!isAuthenticated) {
+    return <LoginPage onLogin={handleLogin} />;
+  }
 
   const renderView = () => {
     switch (currentView) {
