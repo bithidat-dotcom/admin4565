@@ -5,6 +5,7 @@ import ProductsPage from './components/ProductsPage';
 import OrdersPage from './components/OrdersPage';
 import HistoryPage from './components/HistoryPage';
 import BannersPage from './components/BannersPage';
+import ReviewsPage from './components/ReviewsPage';
 import LoginPage from './components/LoginPage';
 import { View } from './types';
 import { motion, AnimatePresence } from 'motion/react';
@@ -18,6 +19,16 @@ export default function App() {
     if (authStatus === 'true') {
       setIsAuthenticated(true);
     }
+
+    const handleNavigateToReviews = () => {
+      setCurrentView('reviews');
+    };
+
+    window.addEventListener('navigate_to_reviews_view', handleNavigateToReviews);
+
+    return () => {
+      window.removeEventListener('navigate_to_reviews_view', handleNavigateToReviews);
+    };
   }, []);
 
   const handleLogin = () => {
@@ -41,6 +52,8 @@ export default function App() {
         return <HistoryPage />;
       case 'banners':
         return <BannersPage />;
+      case 'reviews':
+        return <ReviewsPage />;
       default:
         return <Dashboard />;
     }

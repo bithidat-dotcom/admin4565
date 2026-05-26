@@ -2,11 +2,59 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Order } from '../types';
 import Header from '../components/Header';
+import Modal from './Modal';
 import { Loader2, Phone, MapPin, Package, Clock, CheckCircle, Search, Trash2 } from 'lucide-react';
 import { formatCurrency, cn } from '../lib/utils';
 import { format, isSameDay } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
 import { Calendar } from 'lucide-react';
+
+interface ParsedItem {
+  id: string;
+  name: string;
+  quantity: number;
+}
+
+const parseProductsList = (productNameStr: string): ParsedItem[] => {
+  if (!productNameStr) return [];
+  const parts = productNameStr.split(/(?:,|\+|\r?\n)+/);
+  return parts.map((part, index) => {
+    let clean = part.trim();
+    if (!clean) return null;
+    
+    let quantity = 1;
+    
+    const xPattern = /\s+x\s*(\d+)\s*$/i;
+    const parenPattern = /\s*\(x?(\d+)\)\s*$/i;
+    const leadingXPattern = /^\s*(\d+)\s*x\s+/i;
+    
+    if (xPattern.test(clean)) {
+      const match = clean.match(xPattern);
+      if (match) {
+        quantity = parseInt(match[1], 10);
+        clean = clean.replace(xPattern, '').trim();
+      }
+    } else if (parenPattern.test(clean)) {
+      const match = clean.match(parenPattern);
+      if (match) {
+        quantity = parseInt(match[1], 10);
+        clean = clean.replace(parenPattern, '').trim();
+      }
+    } else if (leadingXPattern.test(clean)) {
+      const match = clean.match(leadingXPattern);
+      if (match) {
+        quantity = parseInt(match[1], 10);
+        clean = clean.replace(leadingXPattern, '').trim();
+      }
+    }
+    
+    return {
+      id: `${index}-${clean}`,
+      name: clean,
+      quantity
+    };
+  }).filter((item): item is ParsedItem => item !== null);
+};
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -19,6 +67,11 @@ export default function OrdersPage() {
   const [confirmCompleteId, setConfirmCompleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [bulkProcessing, setBulkProcessing] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Safe Non-Blocking Confirmation States
+  const [orderToDelete, setOrderToDelete] = useState<string | null>(null);
+  const [orderToCancel, setOrderToCancel] = useState<string | null>(null);
 
   useEffect(() => {
     fetchOrders();
@@ -35,16 +88,26 @@ export default function OrdersPage() {
         },
         (payload) => {
           if (payload.eventType === 'INSERT') {
-            setOrders((prev) => [payload.new as Order, ...prev]);
+            const newOrder = payload.new as Order;
+            if (newOrder.status === 'pending' || newOrder.status === 'confirmed') {
+              setOrders((prev) => [newOrder, ...prev]);
+            }
           } else if (payload.eventType === 'UPDATE') {
-            if (payload.new.status === 'completed') {
-               setOrders((prev) => prev.filter((order) => order.id !== payload.new.id));
+            const updatedOrder = payload.new as Order;
+            if (updatedOrder.status === 'pending' || updatedOrder.status === 'confirmed') {
+              setOrders((prev) => {
+                const exists = prev.some((o) => o.id === updatedOrder.id);
+                if (exists) {
+                  return prev.map((order) => 
+                    order.id === updatedOrder.id ? updatedOrder : order
+                  );
+                } else {
+                  return [updatedOrder, ...prev].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+                }
+              });
             } else {
-              setOrders((prev) => 
-                prev.map((order) => 
-                  order.id === payload.new.id ? { ...order, ...payload.new as Order } : order
-                )
-              );
+              // Status changed to cancelled, completed or something else, filter it out from active order view
+              setOrders((prev) => prev.filter((order) => order.id !== updatedOrder.id));
             }
           } else if (payload.eventType === 'DELETE') {
             setOrders((prev) => prev.filter((order) => order.id !== payload.old.id));
@@ -126,8 +189,14 @@ export default function OrdersPage() {
     }
   };
 
-  const handleCancelOrder = async (id: string) => {
-    if (!window.confirm('Are you sure you want to cancel this order?')) return;
+  const handleCancelOrder = (id: string) => {
+    setOrderToCancel(id);
+  };
+
+  const confirmCancelOrder = async () => {
+    if (!orderToCancel) return;
+    const id = orderToCancel;
+    setOrderToCancel(null);
     setDeletingId(id);
     try {
       const { error } = await supabase.from('orders').update({ status: 'cancelled' }).eq('id', id);
@@ -144,11 +213,43 @@ export default function OrdersPage() {
     }
   };
 
+  const handleDeleteOrder = (id: string) => {
+    setOrderToDelete(id);
+  };
+
+  const confirmDeleteOrder = async () => {
+    if (!orderToDelete) return;
+    const id = orderToDelete;
+    setOrderToDelete(null);
+    setDeletingId(id);
+    setErrorMsg(null);
+    try {
+      const { error } = await supabase.from('orders').delete().eq('id', id);
+      if (error) throw error;
+      
+      setOrders(orders.filter(o => o.id !== id));
+      const newSelection = new Set(selectedOrders);
+      newSelection.delete(id);
+      setSelectedOrders(newSelection);
+    } catch (err: any) {
+      console.error('Error deleting order:', err);
+      setErrorMsg(`Failed to delete order from the server: ${err.message || err}. Please ensure you have run the latest SQL script inside /supabase_schema.sql in your Supabase SQL Editor.`);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   const handleCompleteOrder = async (id: string) => {
     setProcessingId(id);
+    console.log('Completing order:', id);
     try {
-      await supabase.from('orders').update({ status: 'completed' }).eq('id', id);
+      const { error } = await supabase.from('orders').update({ status: 'completed' }).eq('id', id);
+      if (error) {
+        console.error('Error in handleCompleteOrder:', error);
+        throw error;
+      }
       
+      console.log('Order set to completed:', id);
       setOrders(orders.filter(o => o.id !== id));
       const newSelection = new Set(selectedOrders);
       newSelection.delete(id);
@@ -184,6 +285,13 @@ export default function OrdersPage() {
       <Header title="Orders" />
 
       <main className="p-8">
+        {errorMsg && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 text-xs font-bold uppercase tracking-wider flex items-center justify-between">
+            <span>{errorMsg}</span>
+            <button onClick={() => setErrorMsg(null)} className="ml-4 font-black text-red-800 hover:text-red-950 cursor-pointer">✕</button>
+          </div>
+        )}
+
         <div className="mb-8 flex items-center justify-between gap-4">
           <div className="flex flex-col sm:flex-row sm:items-center gap-4">
             <div className="flex items-center gap-4">
@@ -314,26 +422,60 @@ export default function OrdersPage() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-slate-50/50 rounded-xl p-4 border border-slate-100 flex items-center gap-4 group">
-                          <div className="w-10 h-10 bg-white rounded-lg border border-slate-200 flex items-center justify-center text-brand shrink-0 group-hover:scale-110 transition-transform">
-                            <Package className="w-5 h-5" />
+                      {(() => {
+                        const parsedItems = parseProductsList(order.product_name);
+                        return (
+                          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mt-1">
+                            {/* Products List (Left side) */}
+                            <div className="md:col-span-7 bg-slate-50/50 rounded-xl p-4 border border-slate-100 space-y-2">
+                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+                                <Package className="w-3.5 h-3.5 text-slate-400" />
+                                Ordered items ({parsedItems.length})
+                              </p>
+                              <div className="space-y-1.5 max-h-[160px] overflow-y-auto pr-1">
+                                {parsedItems.map((item) => (
+                                  <div key={item.id} className="flex items-center justify-between bg-white px-3 py-2 rounded-lg border border-slate-100 shadow-xs hover:border-slate-300 transition-all">
+                                    <div className="flex items-center gap-2.5 overflow-hidden">
+                                      <span className="flex h-5 min-w-[20px] px-1 items-center justify-center rounded bg-slate-100 text-[10px] font-bold text-slate-600 border border-slate-200 shrink-0">
+                                        {item.quantity}x
+                                      </span>
+                                      <span className="font-bold text-xs text-slate-800 uppercase truncate" title={item.name}>
+                                        {item.name}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                                {parsedItems.length === 0 && (
+                                  <span className="text-xs text-slate-500 italic">{order.product_name}</span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Pricing & Taka display (Right side) */}
+                            <div className="md:col-span-5 bg-brand/[0.02] border border-brand/10 p-4 rounded-xl flex flex-col justify-between">
+                              <div className="w-full">
+                                <p className="text-[10px] font-black text-brand uppercase tracking-widest mb-2 flex items-center gap-1">
+                                  <span className="text-xs font-black">৳</span> payment breakdown
+                                </p>
+                                <div className="space-y-1.5 text-[11px]">
+                                  <div className="flex justify-between font-bold text-slate-500">
+                                    <span>Subtotal:</span>
+                                    <span>{formatCurrency(order.price)}</span>
+                                  </div>
+                                  <div className="flex justify-between font-bold text-slate-500">
+                                    <span>Delivery Charge:</span>
+                                    <span className="text-amber-600">+ {formatCurrency(150)}</span>
+                                  </div>
+                                  <div className="border-t border-slate-200/60 my-2 pt-2 flex justify-between font-black text-slate-800 text-xs">
+                                    <span>Total Price:</span>
+                                    <span className="text-brand text-sm">{formatCurrency(Number(order.price) + 150)}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
                           </div>
-                          <div className="overflow-hidden">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Product</p>
-                            <p className="font-bold text-slate-800 truncate">{order.product_name}</p>
-                          </div>
-                        </div>
-                        <div className="bg-brand/5 rounded-xl p-4 border border-brand/10 flex items-center gap-4 group">
-                           <div className="w-10 h-10 bg-white rounded-lg border border-brand/20 flex items-center justify-center text-brand shrink-0 group-hover:scale-110 transition-transform">
-                            <span className="font-black text-sm">৳</span>
-                          </div>
-                          <div>
-                            <p className="text-[10px] font-bold text-brand uppercase tracking-widest">Total Price</p>
-                            <p className="font-black text-slate-900 leading-none">{formatCurrency(order.price)}</p>
-                          </div>
-                        </div>
-                      </div>
+                        );
+                      })()}
                     </div>
 
                     <div className="flex flex-col items-end gap-4 min-w-[200px]">
@@ -374,42 +516,62 @@ export default function OrdersPage() {
                                 <button
                                   onClick={() => updateStatus(order.id, order.status)}
                                   disabled={statusUpdatingId === order.id}
-                                  className="w-full px-6 py-3 rounded-lg font-black uppercase tracking-widest text-xs transition-all flex items-center justify-center gap-2 bg-brand text-white hover:bg-brand-dark shadow-lg shadow-indigo-100 disabled:opacity-50"
+                                  className="w-full px-6 py-3 rounded-lg font-black uppercase tracking-widest text-xs transition-all flex items-center justify-center gap-2 bg-brand text-white hover:bg-brand-dark shadow-lg shadow-indigo-100 disabled:opacity-50 cursor-pointer"
                                 >
                                   {statusUpdatingId === order.id ? <Loader2 className="w-4 h-4 animate-spin"/> : <CheckCircle className="w-4 h-4" />}
                                   Confirm Order
                                 </button>
-                                <button
-                                  onClick={() => handleCancelOrder(order.id)}
-                                  disabled={deletingId === order.id}
-                                  className="w-full px-6 py-2 rounded-lg font-bold uppercase tracking-widest text-[10px] transition-all bg-red-50 text-red-500 hover:bg-red-100 flex items-center justify-center gap-2 disabled:opacity-50"
-                                >
-                                  {deletingId === order.id ? <Loader2 className="w-3 h-3 animate-spin"/> : <Trash2 className="w-3 h-3" />}
-                                  Cancel Order
-                                </button>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCancelOrder(order.id)}
+                                    disabled={deletingId === order.id}
+                                    className="px-4 py-2 rounded-lg font-bold uppercase tracking-widest text-[10px] transition-all bg-amber-50 text-amber-600 hover:bg-amber-100 flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteOrder(order.id)}
+                                    disabled={deletingId === order.id}
+                                    className="px-4 py-2 rounded-lg font-bold uppercase tracking-widest text-[10px] transition-all bg-red-50 text-red-500 hover:bg-red-100 flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
                               </div>
                             ) : (
                               <div className="flex flex-col gap-2 w-full">
                                 <button
                                   onClick={() => setConfirmCompleteId(order.id)}
-                                  className="w-full px-6 py-3 rounded-lg font-black uppercase tracking-widest text-xs transition-all flex items-center justify-center gap-2 bg-emerald-500 text-white hover:bg-emerald-600 shadow-lg shadow-emerald-100"
+                                  className="w-full px-6 py-3 rounded-lg font-black uppercase tracking-widest text-xs transition-all flex items-center justify-center gap-2 bg-emerald-500 text-white hover:bg-emerald-600 shadow-lg shadow-emerald-100 cursor-pointer"
                                 >
                                   Complete Order & Save
                                 </button>
-                                <div className="flex gap-2 w-full">
+                                <div className="grid grid-cols-3 gap-2 w-full">
                                   <button
+                                    type="button"
                                     onClick={() => updateStatus(order.id, order.status)}
                                     disabled={statusUpdatingId === order.id}
-                                    className="flex-1 px-4 py-2 rounded-lg font-bold uppercase tracking-widest text-[10px] transition-all bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center gap-2 disabled:opacity-50"
+                                    className="px-2 py-2 rounded-lg font-bold uppercase tracking-widest text-[9px] transition-all bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center gap-1 disabled:opacity-50 cursor-pointer text-center"
                                   >
-                                    {statusUpdatingId === order.id ? <Loader2 className="w-3 h-3 animate-spin"/> : null}
-                                    Mark Pending
+                                    {statusUpdatingId === order.id ? <Loader2 className="w-3 h-3 animate-spin shrink-0"/> : null}
+                                    Pending
                                   </button>
                                   <button
+                                    type="button"
                                     onClick={() => handleCancelOrder(order.id)}
                                     disabled={deletingId === order.id}
-                                    className="flex-none px-4 py-2 rounded-lg font-bold text-red-500 transition-all bg-red-50 hover:bg-red-100 flex items-center justify-center disabled:opacity-50"
-                                    title="Cancel Order"
+                                    className="px-2 py-2 rounded-lg font-bold uppercase tracking-widest text-[9px] transition-all bg-amber-50 text-amber-600 hover:bg-amber-100 flex items-center justify-center gap-1 disabled:opacity-50 cursor-pointer text-center"
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteOrder(order.id)}
+                                    disabled={deletingId === order.id}
+                                    className="px-2 py-2 rounded-lg font-bold text-red-500 transition-all bg-red-50 hover:bg-red-100 flex items-center justify-center disabled:opacity-50 cursor-pointer"
+                                    title="Delete Order"
                                   >
                                     {deletingId === order.id ? <Loader2 className="w-4 h-4 animate-spin"/> : <Trash2 className="w-4 h-4" />}
                                   </button>
@@ -435,6 +597,59 @@ export default function OrdersPage() {
           </div>
         )}
       </main>
+
+      {/* Confirmation Modals to avoid window.confirm failures */}
+      <Modal
+        isOpen={orderToDelete !== null}
+        onClose={() => setOrderToDelete(null)}
+        title="Delete Order Permanently?"
+      >
+        <div className="space-y-6">
+          <p className="text-sm font-bold text-slate-600 uppercase tracking-wide leading-relaxed">
+            Are you absolutely sure you want to permanently delete this order? This action cannot be undone.
+          </p>
+          <div className="flex gap-4">
+            <button
+              onClick={confirmDeleteOrder}
+              className="flex-1 py-3.5 bg-red-500 hover:bg-red-600 active:scale-98 transition-all text-white text-xs font-black uppercase tracking-widest rounded-xl shadow-lg shadow-red-100 cursor-pointer"
+            >
+              Yes, Delete Permanently
+            </button>
+            <button
+              onClick={() => setOrderToDelete(null)}
+              className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 active:scale-98 transition-all text-slate-600 text-xs font-black uppercase tracking-widest rounded-xl cursor-pointer"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={orderToCancel !== null}
+        onClose={() => setOrderToCancel(null)}
+        title="Cancel Order?"
+      >
+        <div className="space-y-6">
+          <p className="text-sm font-bold text-slate-600 uppercase tracking-wide leading-relaxed">
+            Are you sure you want to change the status of this order as cancelled?
+          </p>
+          <div className="flex gap-4">
+            <button
+              onClick={confirmCancelOrder}
+              className="flex-1 py-3.5 bg-amber-500 hover:bg-amber-600 active:scale-98 transition-all text-white text-xs font-black uppercase tracking-widest rounded-xl shadow-lg shadow-amber-100 cursor-pointer"
+            >
+              Yes, Cancel Order
+            </button>
+            <button
+              onClick={() => setOrderToCancel(null)}
+              className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 active:scale-98 transition-all text-slate-600 text-xs font-black uppercase tracking-widest rounded-xl cursor-pointer"
+            >
+              No, Keep Active
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

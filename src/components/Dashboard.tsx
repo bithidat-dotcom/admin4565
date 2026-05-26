@@ -72,10 +72,10 @@ export default function Dashboard() {
   };
 
   const statCards = [
+    { label: 'COMPANY GROWTH', value: '+24.5%', icon: TrendingUp, color: 'text-emerald-500', bg: 'bg-emerald-50', change: '↑ 5% this week', changeColor: 'text-emerald-500' },
     { label: 'TOTAL SALES', value: formatCurrency(stats.totalRevenue), icon: TrendingUp, color: 'text-emerald-500', bg: 'bg-emerald-50', change: '↑ 12% vs last month', changeColor: 'text-emerald-500' },
     { label: 'LIVE ORDERS', value: stats.totalOrders.toString(), icon: ShoppingCart, color: 'text-brand', bg: 'bg-indigo-50', change: `${stats.pendingOrders} pending confirm`, changeColor: 'text-brand' },
     { label: 'TOTAL PRODUCTS', value: stats.totalProducts.toString(), icon: ShoppingBag, color: 'text-brand-dark', bg: 'bg-slate-100', change: '8 low on stock', changeColor: 'text-amber-500' },
-    { label: 'AVG. VALUE', value: formatCurrency(stats.totalRevenue > 0 ? stats.totalRevenue / (stats.totalOrders || 1) : 0), icon: Users, color: 'text-slate-500', bg: 'bg-slate-50', change: 'Flat since Jan', changeColor: 'text-slate-400' },
   ];
 
   // Dummy chart data related to order dates could be built if we have real data

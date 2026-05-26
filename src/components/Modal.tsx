@@ -1,15 +1,17 @@
 import React from 'react';
 import { X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { cn } from '../lib/utils';
 
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
   children: React.ReactNode;
+  fullScreen?: boolean;
 }
 
-export default function Modal({ isOpen, onClose, title, children }: ModalProps) {
+export default function Modal({ isOpen, onClose, title, children, fullScreen = false }: ModalProps) {
   return (
     <AnimatePresence>
       {isOpen && (
@@ -27,7 +29,7 @@ export default function Modal({ isOpen, onClose, title, children }: ModalProps) 
             exit={{ opacity: 0, scale: 0.98, y: 10 }}
             className="fixed inset-0 z-[51] flex items-center justify-center pointer-events-none p-4"
           >
-            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-xl pointer-events-auto overflow-hidden border border-slate-200/50">
+            <div className={cn("bg-white rounded-3xl shadow-2xl w-full pointer-events-auto overflow-hidden border border-slate-200/50", fullScreen ? "max-w-5xl h-[90vh]" : "max-w-xl")}>
               <div className="flex items-center justify-between p-8 pb-4 border-b border-slate-50">
                 <div>
                   <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">{title}</h3>
