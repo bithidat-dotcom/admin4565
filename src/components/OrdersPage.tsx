@@ -9,53 +9,6 @@ import { format, isSameDay } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
 import { Calendar } from 'lucide-react';
 
-interface ParsedItem {
-  id: string;
-  name: string;
-  quantity: number;
-}
-
-const parseProductsList = (productNameStr: string): ParsedItem[] => {
-  if (!productNameStr) return [];
-  const parts = productNameStr.split(/(?:,|\+|\r?\n)+/);
-  return parts.map((part, index) => {
-    let clean = part.trim();
-    if (!clean) return null;
-    
-    let quantity = 1;
-    
-    const xPattern = /\s+x\s*(\d+)\s*$/i;
-    const parenPattern = /\s*\(x?(\d+)\)\s*$/i;
-    const leadingXPattern = /^\s*(\d+)\s*x\s+/i;
-    
-    if (xPattern.test(clean)) {
-      const match = clean.match(xPattern);
-      if (match) {
-        quantity = parseInt(match[1], 10);
-        clean = clean.replace(xPattern, '').trim();
-      }
-    } else if (parenPattern.test(clean)) {
-      const match = clean.match(parenPattern);
-      if (match) {
-        quantity = parseInt(match[1], 10);
-        clean = clean.replace(parenPattern, '').trim();
-      }
-    } else if (leadingXPattern.test(clean)) {
-      const match = clean.match(leadingXPattern);
-      if (match) {
-        quantity = parseInt(match[1], 10);
-        clean = clean.replace(leadingXPattern, '').trim();
-      }
-    }
-    
-    return {
-      id: `${index}-${clean}`,
-      name: clean,
-      quantity
-    };
-  }).filter((item): item is ParsedItem => item !== null);
-};
-
 export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,7 +20,6 @@ export default function OrdersPage() {
   const [confirmCompleteId, setConfirmCompleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [bulkProcessing, setBulkProcessing] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Safe Non-Blocking Confirmation States
   const [orderToDelete, setOrderToDelete] = useState<string | null>(null);
@@ -222,7 +174,6 @@ export default function OrdersPage() {
     const id = orderToDelete;
     setOrderToDelete(null);
     setDeletingId(id);
-    setErrorMsg(null);
     try {
       const { error } = await supabase.from('orders').delete().eq('id', id);
       if (error) throw error;
@@ -231,9 +182,8 @@ export default function OrdersPage() {
       const newSelection = new Set(selectedOrders);
       newSelection.delete(id);
       setSelectedOrders(newSelection);
-    } catch (err: any) {
+    } catch (err) {
       console.error('Error deleting order:', err);
-      setErrorMsg(`Failed to delete order from the server: ${err.message || err}. Please ensure you have run the latest SQL script inside /supabase_schema.sql in your Supabase SQL Editor.`);
     } finally {
       setDeletingId(null);
     }
@@ -285,13 +235,6 @@ export default function OrdersPage() {
       <Header title="Orders" />
 
       <main className="p-8">
-        {errorMsg && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 text-xs font-bold uppercase tracking-wider flex items-center justify-between">
-            <span>{errorMsg}</span>
-            <button onClick={() => setErrorMsg(null)} className="ml-4 font-black text-red-800 hover:text-red-950 cursor-pointer">✕</button>
-          </div>
-        )}
-
         <div className="mb-8 flex items-center justify-between gap-4">
           <div className="flex flex-col sm:flex-row sm:items-center gap-4">
             <div className="flex items-center gap-4">
@@ -422,60 +365,26 @@ export default function OrdersPage() {
                         </div>
                       </div>
 
-                      {(() => {
-                        const parsedItems = parseProductsList(order.product_name);
-                        return (
-                          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mt-1">
-                            {/* Products List (Left side) */}
-                            <div className="md:col-span-7 bg-slate-50/50 rounded-xl p-4 border border-slate-100 space-y-2">
-                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
-                                <Package className="w-3.5 h-3.5 text-slate-400" />
-                                Ordered items ({parsedItems.length})
-                              </p>
-                              <div className="space-y-1.5 max-h-[160px] overflow-y-auto pr-1">
-                                {parsedItems.map((item) => (
-                                  <div key={item.id} className="flex items-center justify-between bg-white px-3 py-2 rounded-lg border border-slate-100 shadow-xs hover:border-slate-300 transition-all">
-                                    <div className="flex items-center gap-2.5 overflow-hidden">
-                                      <span className="flex h-5 min-w-[20px] px-1 items-center justify-center rounded bg-slate-100 text-[10px] font-bold text-slate-600 border border-slate-200 shrink-0">
-                                        {item.quantity}x
-                                      </span>
-                                      <span className="font-bold text-xs text-slate-800 uppercase truncate" title={item.name}>
-                                        {item.name}
-                                      </span>
-                                    </div>
-                                  </div>
-                                ))}
-                                {parsedItems.length === 0 && (
-                                  <span className="text-xs text-slate-500 italic">{order.product_name}</span>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Pricing & Taka display (Right side) */}
-                            <div className="md:col-span-5 bg-brand/[0.02] border border-brand/10 p-4 rounded-xl flex flex-col justify-between">
-                              <div className="w-full">
-                                <p className="text-[10px] font-black text-brand uppercase tracking-widest mb-2 flex items-center gap-1">
-                                  <span className="text-xs font-black">৳</span> payment breakdown
-                                </p>
-                                <div className="space-y-1.5 text-[11px]">
-                                  <div className="flex justify-between font-bold text-slate-500">
-                                    <span>Subtotal:</span>
-                                    <span>{formatCurrency(order.price)}</span>
-                                  </div>
-                                  <div className="flex justify-between font-bold text-slate-500">
-                                    <span>Delivery Charge:</span>
-                                    <span className="text-amber-600">+ {formatCurrency(150)}</span>
-                                  </div>
-                                  <div className="border-t border-slate-200/60 my-2 pt-2 flex justify-between font-black text-slate-800 text-xs">
-                                    <span>Total Price:</span>
-                                    <span className="text-brand text-sm">{formatCurrency(Number(order.price) + 150)}</span>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-slate-50/50 rounded-xl p-4 border border-slate-100 flex items-center gap-4 group">
+                          <div className="w-10 h-10 bg-white rounded-lg border border-slate-200 flex items-center justify-center text-brand shrink-0 group-hover:scale-110 transition-transform">
+                            <Package className="w-5 h-5" />
                           </div>
-                        );
-                      })()}
+                          <div className="overflow-hidden">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Product</p>
+                            <p className="font-bold text-slate-800 truncate">{order.product_name}</p>
+                          </div>
+                        </div>
+                        <div className="bg-brand/5 rounded-xl p-4 border border-brand/10 flex items-center gap-4 group">
+                           <div className="w-10 h-10 bg-white rounded-lg border border-brand/20 flex items-center justify-center text-brand shrink-0 group-hover:scale-110 transition-transform">
+                            <span className="font-black text-sm">৳</span>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold text-brand uppercase tracking-widest">Total Price</p>
+                            <p className="font-black text-slate-900 leading-none">{formatCurrency(order.price)}</p>
+                          </div>
+                        </div>
+                      </div>
                     </div>
 
                     <div className="flex flex-col items-end gap-4 min-w-[200px]">

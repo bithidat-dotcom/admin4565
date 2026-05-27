@@ -25,9 +25,6 @@ export interface Order {
 export interface Banner {
   id: string;
   image: string;
-  ad_link?: string | null;
-  ad_title?: string | null;
-  is_ad?: boolean;
   created_at: string;
 }
 
@@ -53,28 +50,4 @@ export interface ProductHistoryEntry {
   changed_at: string;
 }
 
-export interface ProductReview {
-  id: number;
-  product_id: string;
-  user_name: string;
-  rating: number;
-  comment: string;
-  created_at: string;
-}
-
-export interface ReviewReply {
-  id: number;
-  review_id: number;
-  reply_user: string;
-  reply_comment: string;
-  created_at: string;
-}
-
-export interface ProductLike {
-  id: string;
-  product_id: string;
-  user_ip: string;
-  created_at: string;
-}
-
-export type View = 'dashboard' | 'products' | 'orders' | 'banners' | 'history' | 'reviews';
+export type View = 'dashboard' | 'products' | 'orders' | 'banners' | 'history';

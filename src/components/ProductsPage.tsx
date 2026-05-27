@@ -297,20 +297,9 @@ export default function ProductsPage() {
                     <span className="text-lg font-black text-slate-900 tracking-tighter">
                       {formatCurrency(product.price)}
                     </span>
-                    <div className="flex gap-2">
-                      <button 
-                        onClick={() => {
-                          localStorage.setItem('review_product_filter_id', product.id);
-                          window.dispatchEvent(new Event('navigate_to_reviews_view'));
-                        }}
-                        className="text-[10px] font-black text-brand uppercase tracking-widest hover:underline cursor-pointer bg-brand/5 px-2.5 py-1 rounded-lg"
-                      >
-                        Review
-                      </button>
-                      <button className="text-[10px] font-black text-[#64748b] uppercase tracking-widest hover:underline">
-                        Details
-                      </button>
-                    </div>
+                    <button className="text-[10px] font-black text-brand uppercase tracking-widest hover:underline">
+                      Details
+                    </button>
                   </div>
                 </div>
               </div>
