@@ -7,6 +7,7 @@ export interface Product {
   images: string[];
   discount: number;
   seller?: string;
+  category?: string;
   created_at: string;
 }
 
@@ -17,7 +18,11 @@ export interface Order {
   location: string;
   price: number;
   product_details: string;
-  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  product_name?: string;
+  quantity?: number | string;
+  user_id?: string;
+  cancelled_by?: 'user' | 'admin';
+  status: 'pending' | 'packing' | 'shipping' | 'delivered' | 'completed' | 'cancelled';
   created_at: string;
 }
 
@@ -37,4 +42,17 @@ export interface Review {
   created_at: string;
 }
 
-export type View = 'dashboard' | 'products' | 'orders' | 'banners' | 'reviews';
+export interface User {
+  id: string;
+  name: string;
+  whatsapp_number: string;
+  location: string;
+  email?: string;
+  total_orders?: number;
+  total_spent?: number;
+  wallet_balance?: number;
+  last_login?: string;
+  created_at: string;
+}
+
+export type View = 'dashboard' | 'products' | 'orders' | 'banners' | 'reviews' | 'users';

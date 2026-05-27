@@ -53,6 +53,45 @@
         "created_at": { "type": "string", "format": "date-time" }
       },
       "required": ["customer_name", "rating", "comment"]
+    },
+    "User": {
+      "title": "User",
+      "description": "Customer profile details",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Full name" },
+        "whatsapp_number": { "type": "string", "description": "WhatsApp contact" },
+        "location": { "type": "string", "description": "Primary delivery address" },
+        "email": { "type": "string", "description": "Email address" },
+        "total_orders": { "type": "number", "default": 0 },
+        "last_login": { "type": "string", "format": "date-time" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "whatsapp_number"]
+    },
+    "Chat": {
+      "title": "Chat",
+      "description": "A conversation between a user and admin",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string" },
+        "user_name": { "type": "string" },
+        "last_message": { "type": "string" },
+        "unread_count": { "type": "number", "default": 0 },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["user_id", "user_name"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "An individual chat message",
+      "type": "object",
+      "properties": {
+        "text": { "type": "string" },
+        "sender": { "type": "string", "enum": ["user", "admin"] },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["text", "sender"]
     }
   },
   "firestore": {
@@ -71,6 +110,18 @@
     "/reviews": {
       "schema": "Review",
       "description": "Product reviews"
+    },
+    "/users": {
+      "schema": "User",
+      "description": "Registered customers"
+    },
+    "/chats": {
+      "schema": "Chat",
+      "description": "Conversation list"
+    },
+    "/chats/{chatId}/messages": {
+      "schema": "Message",
+      "description": "Messages within a conversation"
     }
   }
 }

@@ -67,31 +67,31 @@ export default function ReviewsPage() {
     <div className="flex-1 overflow-x-hidden">
       <Header title="Customer Reviews" />
 
-      <main className="p-8">
+      <main className="p-4 md:p-8">
         {loading ? (
           <div className="flex items-center justify-center h-64">
             <Loader2 className="w-8 h-8 text-brand animate-spin" />
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
             {reviews.map((review) => (
               <div 
                 key={review.id} 
-                className="bg-white rounded-2xl border border-slate-200 p-6 flex flex-col shadow-sm hover:shadow-md transition-all group"
+                className="bg-white rounded-2xl border border-slate-200 p-6 flex flex-col shadow-sm hover:shadow-md transition-all group relative"
               >
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center font-black text-slate-400 text-sm">
-                      {review.customer_name.charAt(0)}
+                      {review.customer_name?.charAt(0) || '?'}
                     </div>
                     <div>
-                      <h3 className="font-black text-slate-900 text-sm tracking-tight">{review.customer_name}</h3>
+                      <h3 className="font-black text-slate-900 text-sm tracking-tight">{review.customer_name || 'Anonymous Reviewer'}</h3>
                       {renderStars(review.rating)}
                     </div>
                   </div>
                   <button
                     onClick={() => setReviewToDelete(review.id)}
-                    className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                    className="p-2 text-slate-400 md:text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>

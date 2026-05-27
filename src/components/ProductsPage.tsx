@@ -5,7 +5,8 @@ import { Product } from '../types';
 import Header from '../components/Header';
 import Modal from '../components/Modal';
 import { Edit2, Trash2, Loader2, Image as ImageIcon, Plus } from 'lucide-react';
-import { formatCurrency } from '../lib/utils';
+import ImageUploader from './ImageUploader';
+import { formatCurrency, cn } from '../lib/utils';
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -13,6 +14,7 @@ export default function ProductsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [activeProductId, setActiveProductId] = useState<string | null>(null);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -22,14 +24,19 @@ export default function ProductsPage() {
     image: '',
     images: [] as string[],
     discount: '0',
-    seller: ''
+    seller: '',
+    category: 'Food'
   });
 
   const [newImageUrl, setNewImageUrl] = useState('');
   const [filterName, setFilterName] = useState('');
+  const [filterCategory, setFilterCategory] = useState('All');
+
+  const categories = ['Food', 'Fashion', 'Gadget', 'Robotic', 'PC', 'Cloth', 'Sports', 'Grocery'];
 
   const filteredProducts = products.filter(product => 
-    product.name.toLowerCase().includes(filterName.toLowerCase())
+    product.name.toLowerCase().includes(filterName.toLowerCase()) &&
+    (filterCategory === 'All' || product.category === filterCategory)
   );
 
   useEffect(() => {
@@ -60,7 +67,8 @@ export default function ProductsPage() {
       image: '',
       images: [],
       discount: '0',
-      seller: ''
+      seller: '',
+      category: 'Food'
     });
     setEditingProduct(null);
     setNewImageUrl('');
@@ -80,7 +88,8 @@ export default function ProductsPage() {
       image: product.image,
       images: product.images || [],
       discount: product.discount.toString(),
-      seller: product.seller || ''
+      seller: product.seller || '',
+      category: product.category || 'Food'
     });
     setIsModalOpen(true);
   };
@@ -163,6 +172,7 @@ export default function ProductsPage() {
       discount: parseFloat(formData.discount),
       description: formData.description,
       seller: formData.seller,
+      category: formData.category,
       updatedAt: serverTimestamp()
     };
 
@@ -192,10 +202,10 @@ export default function ProductsPage() {
         onAction={handleOpenAddModal} 
         actionLabel="New Product" 
       />
-      <div className="px-8 mt-4 flex items-center gap-4">
+      <div className="px-4 md:px-8 mt-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
         <button
           onClick={handleOpenDeleteAllModal}
-          className="px-4 py-2 bg-red-100 text-red-600 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-red-200 transition-colors"
+          className="px-4 py-3 sm:py-2 bg-red-100 text-red-600 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-red-200 transition-colors shrink-0 text-center"
         >
           Delete All Products
         </button>
@@ -204,21 +214,30 @@ export default function ProductsPage() {
           placeholder="Filter by name..." 
           value={filterName}
           onChange={(e) => setFilterName(e.target.value)}
-          className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 uppercase tracking-widest"
+          className="px-4 py-3 sm:py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 uppercase tracking-widest flex-1 sm:max-w-xs focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none transition-all"
         />
+        <select 
+          value={filterCategory}
+          onChange={(e) => setFilterCategory(e.target.value)}
+          className="px-4 py-3 sm:py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 uppercase tracking-widest sm:max-w-xs focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none transition-all"
+        >
+          <option value="All">All Categories</option>
+          {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+        </select>
       </div>
 
-      <main className="p-8 max-w-[1240px]">
+      <main className="p-4 md:p-8 w-full">
         {loading ? (
           <div className="flex items-center justify-center h-64">
             <Loader2 className="w-8 h-8 text-brand animate-spin" />
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
             {filteredProducts.map((product) => (
               <div 
                 key={product.id} 
-                className="bg-white rounded-xl border border-slate-200 overflow-hidden group hover:shadow-lg transition-all duration-500"
+                onClick={() => setActiveProductId(prev => prev === product.id ? null : product.id)}
+                className="bg-white rounded-xl border border-slate-200 overflow-hidden group hover:shadow-lg transition-all duration-500 cursor-pointer"
               >
                 <div className="aspect-square relative overflow-hidden bg-slate-100">
                   {product.image ? (
@@ -238,16 +257,27 @@ export default function ProductsPage() {
                       -{product.discount}%
                     </div>
                   )}
-                  <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center gap-3 backdrop-blur-[2px]">
+                  <div className={cn(
+                    "absolute inset-0 bg-slate-900/60 transition-all duration-300 flex items-center justify-center gap-3 backdrop-blur-[2px]",
+                    activeProductId === product.id 
+                      ? "opacity-100 pointer-events-auto" 
+                      : "opacity-0 md:group-hover:opacity-100 pointer-events-none md:pointer-events-auto"
+                  )}>
                     <button 
-                      onClick={() => handleEdit(product)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEdit(product);
+                      }}
                       className="p-3 bg-white rounded-xl shadow-xl text-brand hover:scale-110 active:scale-95 transition-all"
                       title="Edit Product"
                     >
                       <Edit2 className="w-5 h-5" />
                     </button>
                     <button 
-                      onClick={() => handleDelete(product.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(product.id);
+                      }}
                       disabled={deletingId === product.id}
                       className="p-3 bg-white rounded-xl shadow-xl text-red-500 hover:scale-110 active:scale-95 transition-all disabled:opacity-50 disabled:scale-100"
                       title="Delete Product"
@@ -276,7 +306,13 @@ export default function ProductsPage() {
                     <span className="text-lg font-black text-slate-900 tracking-tighter">
                       {formatCurrency(product.price)}
                     </span>
-                    <button className="text-[10px] font-black text-brand uppercase tracking-widest hover:underline">
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // Details action simply activates details or logs, we keep it safe
+                      }} 
+                      className="text-[10px] font-black text-brand uppercase tracking-widest hover:underline"
+                    >
                       Details
                     </button>
                   </div>
@@ -351,7 +387,7 @@ export default function ProductsPage() {
             </div>
           </div>
           
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-4 gap-4">
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Price (৳)</label>
               <input
@@ -381,6 +417,18 @@ export default function ProductsPage() {
                 placeholder="Seller Name..."
               />
             </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Category</label>
+              <select
+                value={formData.category}
+                onChange={e => setFormData({ ...formData, category: e.target.value })}
+                className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all text-sm font-medium"
+              >
+                {categories.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div className="space-y-1.5">
@@ -396,30 +444,12 @@ export default function ProductsPage() {
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Main Media Source (URL)</label>
-            <div className="flex gap-4">
-              <div className="flex-1">
-                <input
-                  required
-                  type="url"
-                  value={formData.image}
-                  onChange={e => setFormData({ ...formData, image: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all text-sm font-medium"
-                  placeholder="https://..."
-                />
-              </div>
-              {formData.image && (
-                <div className="w-11 h-11 rounded-lg overflow-hidden border border-slate-200 bg-slate-50 shrink-0">
-                  <img 
-                    src={formData.image} 
-                    alt="Preview" 
-                    referrerPolicy="no-referrer"
-                    className="w-full h-full object-cover"
-                    onError={(e) => (e.currentTarget.style.display = 'none')}
-                  />
-                </div>
-              )}
-            </div>
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Main Media Source</label>
+            <ImageUploader 
+              value={formData.image}
+              onChange={(url) => setFormData(prev => ({...prev, image: url}))}
+              folder="products"
+            />
           </div>
 
           <div className="space-y-3">
@@ -484,7 +514,7 @@ export default function ProductsPage() {
             <button
               type="submit"
               disabled={submitting}
-              className="flex-[2] px-6 py-3 rounded-xl bg-brand text-white text-xs font-black uppercase tracking-widest hover:bg-brand-dark transition-all shadow-lg shadow-indigo-100 flex items-center justify-center gap-2"
+              className="flex-[2] px-6 py-3 rounded-xl bg-slate-900 text-white text-xs font-black uppercase tracking-widest hover:bg-black transition-all shadow-lg shadow-slate-200 flex items-center justify-center gap-2"
             >
               {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
               {editingProduct ? 'Update Data' : 'Save Instance'}

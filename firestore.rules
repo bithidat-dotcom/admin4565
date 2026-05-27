@@ -19,6 +19,18 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    match /users/{id} {
+      allow read, write: if true;
+    }
+
+    match /chats/{chatId} {
+      allow read, write: if true;
+    }
+
+    match /chats/{chatId}/messages/{messageId} {
+      allow read, write: if true;
+    }
+
     // Default deny
     match /{document=**} {
       allow read, write: if false;

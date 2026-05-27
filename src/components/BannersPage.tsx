@@ -5,6 +5,8 @@ import { Banner } from '../types';
 import Header from '../components/Header';
 import Modal from '../components/Modal';
 import { Trash2, Loader2, Image as ImageIcon } from 'lucide-react';
+import { cn } from '../lib/utils';
+import ImageUploader from './ImageUploader';
 
 export default function BannersPage() {
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -14,6 +16,7 @@ export default function BannersPage() {
   const [newImageUrl, setNewImageUrl] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [activeBannerId, setActiveBannerId] = useState<string | null>(null);
 
   useEffect(() => {
     const q = query(collection(db, 'banners'), orderBy('created_at', 'desc'));
@@ -72,17 +75,19 @@ export default function BannersPage() {
     <div className="flex-1 overflow-x-hidden">
       <Header title="Banners" onAction={() => setIsModalOpen(true)} actionLabel="New Banner" />
 
-      <main className="p-8 max-w-[1240px]">
+      <main className="p-4 md:p-8 w-full">
         {loading ? (
           <div className="flex items-center justify-center h-64">
             <Loader2 className="w-8 h-8 text-brand animate-spin" />
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-8">
             {banners.map((banner) => (
               <div 
                 key={banner.id} 
-                className="group relative bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-lg transition-all duration-500"
+                onDoubleClick={() => setActiveBannerId(prev => prev === banner.id ? null : banner.id)}
+                className="group relative bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-lg transition-all duration-500 cursor-pointer select-none"
+                title="Double click on mobile/desktop to reveal controls"
               >
                 <div className="aspect-[21/9] bg-slate-50 overflow-hidden flex items-center justify-center relative">
                   {banner.image ? (
@@ -93,11 +98,19 @@ export default function BannersPage() {
                   <div className="absolute inset-0 bg-slate-900/20 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
                 
-                <div className="absolute top-4 right-4 translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all">
+                <div className={cn(
+                  "absolute top-4 right-4 transition-all duration-300",
+                  activeBannerId === banner.id 
+                    ? "translate-y-0 opacity-100 pointer-events-auto" 
+                    : "translate-y-2 opacity-0 md:group-hover:translate-y-0 md:group-hover:opacity-100 pointer-events-none md:pointer-events-auto"
+                )}>
                   <button 
-                    onClick={() => handleDelete(banner.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(banner.id);
+                    }}
                     disabled={deletingId === banner.id}
-                    className="p-4 bg-red-500 text-white rounded-2xl shadow-2xl hover:bg-red-600 transition-all hover:scale-110 disabled:opacity-50 disabled:scale-100"
+                    className="p-4 bg-red-500 text-white rounded-2xl shadow-2xl hover:bg-red-600 transition-all hover:scale-110 disabled:opacity-50 disabled:scale-100 cursor-pointer"
                   >
                     {deletingId === banner.id ? <Loader2 className="w-5 h-5 animate-spin" /> : <Trash2 className="w-5 h-5" />}
                   </button>
@@ -150,14 +163,11 @@ export default function BannersPage() {
             />
           </div>
           <div className="space-y-2">
-            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Global Asset URL</label>
-            <input
-              required
-              type="url"
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Global Asset</label>
+            <ImageUploader 
               value={newImageUrl}
-              onChange={e => setNewImageUrl(e.target.value)}
-              className="w-full px-4 py-4 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all text-sm font-medium"
-              placeholder="https://..."
+              onChange={setNewImageUrl}
+              folder="banners"
             />
             <p className="text-[10px] text-slate-400 font-semibold italic">* Recommended aspect ratio: 21:9 for best visual performance.</p>
           </div>
@@ -173,7 +183,7 @@ export default function BannersPage() {
             <button
               type="submit"
               disabled={submitting}
-              className="flex-[2] px-6 py-3 rounded-xl bg-brand text-white text-xs font-black uppercase tracking-widest hover:bg-brand-dark transition-all shadow-lg shadow-indigo-100 flex items-center justify-center gap-2"
+              className="flex-[2] px-6 py-3 rounded-xl bg-slate-900 text-white text-xs font-black uppercase tracking-widest hover:bg-black transition-all shadow-lg shadow-slate-200 flex items-center justify-center gap-2"
             >
               {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
               Publish Asset
