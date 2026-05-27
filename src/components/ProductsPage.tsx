@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc, Timestamp, writeBatch, getDocs, serverTimestamp } from 'firebase/firestore';
 import { Product } from '../types';
 import Header from '../components/Header';
 import Modal from '../components/Modal';
-import { Edit2, Trash2, Loader2, Image as ImageIcon, Plus, X } from 'lucide-react';
+import { Edit2, Trash2, Loader2, Image as ImageIcon, Plus } from 'lucide-react';
 import { formatCurrency } from '../lib/utils';
 
 export default function ProductsPage() {
@@ -13,10 +14,6 @@ export default function ProductsPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // Custom / Fixed Categories Support
-  const [customTypes, setCustomTypes] = useState<string[]>(['Fashion', 'Cloth', 'Laptop', 'Mobile', 'Device', 'Robotic', 'Cosmetic', 'T-Shirts', 'All']);
-  const [showCustomTypeInput, setShowCustomTypeInput] = useState(false);
-
   // Form State
   const [formData, setFormData] = useState({
     name: '',
@@ -25,7 +22,6 @@ export default function ProductsPage() {
     image: '',
     images: [] as string[],
     discount: '0',
-    type: '',
     seller: ''
   });
 
@@ -37,24 +33,24 @@ export default function ProductsPage() {
   );
 
   useEffect(() => {
-    fetchProducts();
-  }, []);
-
-  const fetchProducts = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setProducts(data || []);
-    } catch (err) {
-      console.error('Error fetching products:', err);
-    } finally {
+    const q = query(collection(db, 'products'), orderBy('created_at', 'desc'));
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const productsData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        created_at: doc.data().created_at?.toDate?.()?.toISOString() || new Date().toISOString()
+      })) as Product[];
+      
+      setProducts(productsData);
       setLoading(false);
-    }
-  };
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'products');
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const resetForm = () => {
     setFormData({
@@ -64,12 +60,10 @@ export default function ProductsPage() {
       image: '',
       images: [],
       discount: '0',
-      type: '',
       seller: ''
     });
     setEditingProduct(null);
     setNewImageUrl('');
-    setShowCustomTypeInput(false);
   };
 
   const handleOpenAddModal = () => {
@@ -86,7 +80,6 @@ export default function ProductsPage() {
       image: product.image,
       images: product.images || [],
       discount: product.discount.toString(),
-      type: product.type || '',
       seller: product.seller || ''
     });
     setIsModalOpen(true);
@@ -108,11 +101,9 @@ export default function ProductsPage() {
     setProductToDelete(null);
     setDeletingId(id);
     try {
-      const { error } = await supabase.from('products').delete().eq('id', id);
-      if (error) throw error;
-      setProducts(products.filter(p => p.id !== id));
+      await deleteDoc(doc(db, 'products', id));
     } catch (err) {
-      console.error('Error deleting product:', err);
+      handleFirestoreError(err, OperationType.DELETE, `products/${id}`);
     } finally {
       setDeletingId(null);
     }
@@ -134,13 +125,15 @@ export default function ProductsPage() {
 
   const executeDeleteAll = async () => {
     try {
-      // NOTE: This assumes RLS policies allow deleting all rows.
-      const { error } = await supabase.from('products').delete().neq('id', 'non-existent-id-to-remove-all');
-      if (error) throw error;
-      setProducts([]);
+      const querySnapshot = await getDocs(collection(db, 'products'));
+      const batch = writeBatch(db);
+      querySnapshot.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
+      await batch.commit();
       setIsDeleteAllModalOpen(false);
     } catch (err) {
-      console.error('Error deleting all products:', err);
+      handleFirestoreError(err, OperationType.DELETE, 'products');
       alert('Failed to delete all products');
     }
   };
@@ -169,48 +162,28 @@ export default function ProductsPage() {
       images: formData.images,
       discount: parseFloat(formData.discount),
       description: formData.description,
-      type: formData.type,
-      seller: formData.seller
+      seller: formData.seller,
+      updatedAt: serverTimestamp()
     };
 
     try {
       if (editingProduct) {
-        const { error } = await supabase
-          .from('products')
-          .update(payload)
-          .eq('id', editingProduct.id);
-        if (error) throw error;
+        await updateDoc(doc(db, 'products', editingProduct.id), payload);
       } else {
-        const { error } = await supabase
-          .from('products')
-          .insert([payload]);
-        if (error) throw error;
+        await addDoc(collection(db, 'products'), {
+          ...payload,
+          created_at: serverTimestamp()
+        });
       }
       
-      await fetchProducts();
       setIsModalOpen(false);
       resetForm();
-    } catch (err) {
-      console.error('Error saving product:', err);
-      alert('Failed to save product');
+    } catch (err: any) {
+      handleFirestoreError(err, editingProduct ? OperationType.UPDATE : OperationType.CREATE, editingProduct ? `products/${editingProduct.id}` : 'products');
     } finally {
       setSubmitting(false);
     }
   };
-
-  const uniqueTypes = Array.from(new Set([
-    'Fashion',
-    'Cloth',
-    'Laptop',
-    'Mobile',
-    'Device',
-    'Robotic',
-    'Cosmetic',
-    'T-Shirts',
-    'All',
-    ...products.map(p => p.type).filter((t): t is string => !!t && t.trim() !== ''),
-    ...customTypes
-  ]));
 
   return (
     <div className="flex-1 overflow-x-hidden">
@@ -252,6 +225,7 @@ export default function ProductsPage() {
                     <img 
                       src={product.image} 
                       alt={product.name}
+                      referrerPolicy="no-referrer"
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                     />
                   ) : (
@@ -293,6 +267,11 @@ export default function ProductsPage() {
                   <p className="text-slate-500 text-xs mt-2 line-clamp-2 min-h-[32px] leading-relaxed">
                     {product.description}
                   </p>
+                  {product.seller && (
+                    <div className="mt-2 text-[10px] font-bold text-indigo-500 uppercase tracking-tight">
+                      Seller: {product.seller}
+                    </div>
+                  )}
                   <div className="mt-4 flex items-center justify-between border-t border-slate-50 pt-4">
                     <span className="text-lg font-black text-slate-900 tracking-tighter">
                       {formatCurrency(product.price)}
@@ -358,7 +337,7 @@ export default function ProductsPage() {
         fullScreen={true}
       >
         <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4">
             <div className="space-y-1.5 col-span-2">
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Product Name</label>
               <input
@@ -369,73 +348,6 @@ export default function ProductsPage() {
                 className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all text-sm font-medium"
                 placeholder="Product name..."
               />
-            </div>
-            <div className="space-y-1.5 font-sans">
-              <div className="flex items-center justify-between">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Product Type</label>
-                <button
-                  type="button"
-                  onClick={() => setShowCustomTypeInput(!showCustomTypeInput)}
-                  className="text-brand hover:text-brand-dark flex items-center gap-1 text-[9px] uppercase font-black cursor-pointer bg-slate-50 hover:bg-slate-100 px-2 py-0.5 rounded border border-slate-200"
-                >
-                  <Plus className="w-3 h-3" /> Custom
-                </button>
-              </div>
-              
-              {!showCustomTypeInput ? (
-                <select
-                  value={formData.type}
-                  onChange={e => {
-                    if (e.target.value === '__add_custom__') {
-                      setShowCustomTypeInput(true);
-                    } else {
-                      setFormData({ ...formData, type: e.target.value });
-                    }
-                  }}
-                  className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all text-sm font-medium cursor-pointer"
-                >
-                  <option value="">Select Type...</option>
-                  {uniqueTypes.map(t => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
-                  <option value="__add_custom__" className="text-brand font-bold bg-indigo-50 font-black">+ Create Custom Type...</option>
-                </select>
-              ) : (
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={formData.type}
-                    onChange={e => setFormData({ ...formData, type: e.target.value })}
-                    className="flex-1 px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all text-sm font-medium"
-                    placeholder="Enter custom type..."
-                    autoFocus
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (formData.type.trim()) {
-                        const trimmed = formData.type.trim();
-                        if (!customTypes.some(t => t.toLowerCase() === trimmed.toLowerCase())) {
-                          setCustomTypes(prev => [...prev, trimmed]);
-                        }
-                      }
-                      setShowCustomTypeInput(false);
-                    }}
-                    className="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-slate-800 cursor-pointer"
-                  >
-                    Set
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowCustomTypeInput(false);
-                    }}
-                    className="px-3 bg-slate-100 text-slate-500 rounded-xl text-xs font-bold hover:bg-slate-200 cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              )}
             </div>
           </div>
           
@@ -460,7 +372,7 @@ export default function ProductsPage() {
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Seller / Group</label>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Seller Name</label>
               <input
                 type="text"
                 value={formData.seller}
@@ -479,7 +391,7 @@ export default function ProductsPage() {
               value={formData.description}
               onChange={e => setFormData({ ...formData, description: e.target.value })}
               className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all text-sm font-medium resize-none"
-              placeholder="Markdown supported..."
+              placeholder="Enter product details..."
             />
           </div>
 
@@ -501,6 +413,7 @@ export default function ProductsPage() {
                   <img 
                     src={formData.image} 
                     alt="Preview" 
+                    referrerPolicy="no-referrer"
                     className="w-full h-full object-cover"
                     onError={(e) => (e.currentTarget.style.display = 'none')}
                   />
@@ -526,6 +439,7 @@ export default function ProductsPage() {
                    <img 
                     src={newImageUrl} 
                     alt="Preview" 
+                    referrerPolicy="no-referrer"
                     className="w-full h-full object-cover"
                     onError={(e) => (e.currentTarget.style.display = 'none')}
                   />
@@ -535,6 +449,7 @@ export default function ProductsPage() {
                 type="button"
                 onClick={addExtraImage}
                 className="p-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors"
+                disabled={!newImageUrl}
               >
                 <Plus className="w-5 h-5" />
               </button>
@@ -544,7 +459,7 @@ export default function ProductsPage() {
               <div className="flex flex-wrap gap-2 mt-2">
                 {formData.images.map((url, index) => (
                   <div key={index} className="relative group w-14 h-14 rounded-lg overflow-hidden border border-slate-100 bg-slate-50">
-                    <img src={url} alt="" className="w-full h-full object-cover" />
+                    <img src={url} referrerPolicy="no-referrer" alt="" className="w-full h-full object-cover" />
                     <button
                       type="button"
                       onClick={() => removeExtraImage(index)}
@@ -578,7 +493,6 @@ export default function ProductsPage() {
         </form>
       </Modal>
 
-      {/* Confirmation Modal to avoid window.confirm failures */}
       <Modal
         isOpen={productToDelete !== null}
         onClose={() => setProductToDelete(null)}

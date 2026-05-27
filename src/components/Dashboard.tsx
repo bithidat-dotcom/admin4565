@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
 import Header from '../components/Header';
-import { ShoppingBag, ShoppingCart, Image as ImageIcon, TrendingUp, ArrowUpRight, Users, Loader2 } from 'lucide-react';
+import { ShoppingBag, ShoppingCart, TrendingUp, Users, Loader2, Star } from 'lucide-react';
 import { formatCurrency, cn } from '../lib/utils';
-import { format } from 'date-fns';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { Order } from '../types';
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
@@ -13,80 +13,68 @@ export default function Dashboard() {
     totalBanners: 0,
     totalRevenue: 0,
     pendingOrders: 0,
+    totalReviews: 0,
   });
-  const [recentOrders, setRecentOrders] = useState<any[]>([]);
+  const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchStats();
+    // Listen to orders for revenue, total count, and recent list
+    const qOrders = query(collection(db, 'orders'), orderBy('created_at', 'desc'));
+    const unsubscribeOrders = onSnapshot(qOrders, (snapshot) => {
+      const orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Order[];
+      const revenue = orders.reduce((sum, order) => 
+        sum + (['delivered', 'shipped', 'processing'].includes(order.status) ? order.price : 0), 0
+      );
+      const pending = orders.filter(o => o.status === 'pending').length;
 
-    const channel = supabase
-      .channel('dashboard_realtime')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'orders' },
-        () => {
-          fetchStats(); // Just refetch all stats when orders changes
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'products' },
-        () => {
-          fetchStats();
-        }
-      )
-      .subscribe();
+      setStats(prev => ({
+        ...prev,
+        totalOrders: orders.length,
+        totalRevenue: revenue,
+        pendingOrders: pending
+      }));
+      setRecentOrders(orders.slice(0, 5));
+      setLoading(false);
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'orders'));
+
+    // Listen to products count
+    const unsubscribeProducts = onSnapshot(collection(db, 'products'), (snapshot) => {
+      setStats(prev => ({
+        ...prev,
+        totalProducts: snapshot.size
+      }));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'products'));
+
+    // Listen to banners count
+    const unsubscribeBanners = onSnapshot(collection(db, 'banners'), (snapshot) => {
+      setStats(prev => ({
+        ...prev,
+        totalBanners: snapshot.size
+      }));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'banners'));
+
+    // Listen to reviews count
+    const unsubscribeReviews = onSnapshot(collection(db, 'reviews'), (snapshot) => {
+      setStats(prev => ({
+        ...prev,
+        totalReviews: snapshot.size
+      }));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'reviews'));
 
     return () => {
-      supabase.removeChannel(channel);
+      unsubscribeOrders();
+      unsubscribeProducts();
+      unsubscribeBanners();
+      unsubscribeReviews();
     };
   }, []);
 
-  const fetchStats = async () => {
-    try {
-      const [productsRes, ordersRes, bannersRes] = await Promise.all([
-        supabase.from('products').select('*', { count: 'exact', head: true }),
-        supabase.from('orders').select('*').order('created_at', { ascending: false }),
-        supabase.from('banners').select('*', { count: 'exact', head: true })
-      ]);
-
-      const orders = ordersRes.data || [];
-      const revenue = orders.reduce((sum, order) => sum + ((order.status === 'confirmed' || order.status === 'completed') ? order.price : 0), 0);
-      const pending = orders.filter(o => o.status === 'pending').length;
-
-      setStats({
-        totalProducts: productsRes.count || 0,
-        totalOrders: orders.length,
-        totalBanners: bannersRes.count || 0,
-        totalRevenue: revenue,
-        pendingOrders: pending
-      });
-
-      setRecentOrders(orders.slice(0, 5));
-    } catch (err) {
-      console.error('Error fetching dashboard stats:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const statCards = [
-    { label: 'COMPANY GROWTH', value: '+24.5%', icon: TrendingUp, color: 'text-emerald-500', bg: 'bg-emerald-50', change: '↑ 5% this week', changeColor: 'text-emerald-500' },
-    { label: 'TOTAL SALES', value: formatCurrency(stats.totalRevenue), icon: TrendingUp, color: 'text-emerald-500', bg: 'bg-emerald-50', change: '↑ 12% vs last month', changeColor: 'text-emerald-500' },
-    { label: 'LIVE ORDERS', value: stats.totalOrders.toString(), icon: ShoppingCart, color: 'text-brand', bg: 'bg-indigo-50', change: `${stats.pendingOrders} pending confirm`, changeColor: 'text-brand' },
-    { label: 'TOTAL PRODUCTS', value: stats.totalProducts.toString(), icon: ShoppingBag, color: 'text-brand-dark', bg: 'bg-slate-100', change: '8 low on stock', changeColor: 'text-amber-500' },
-  ];
-
-  // Dummy chart data related to order dates could be built if we have real data
-  const chartData = [
-    { name: 'Mon', sales: 4000 },
-    { name: 'Tue', sales: 3000 },
-    { name: 'Wed', sales: 5000 },
-    { name: 'Thu', sales: 2780 },
-    { name: 'Fri', sales: 1890 },
-    { name: 'Sat', sales: 2390 },
-    { name: 'Sun', sales: 3490 },
+    { label: 'DELIVERY REVENUE', value: formatCurrency(stats.totalRevenue), icon: TrendingUp, color: 'text-emerald-500', bg: 'bg-emerald-50', change: 'Live from Firestore', changeColor: 'text-emerald-500' },
+    { label: 'LIVE ORDERS', value: stats.totalOrders.toString(), icon: ShoppingCart, color: 'text-brand', bg: 'bg-indigo-50', change: `${stats.pendingOrders} pending confirmation`, changeColor: 'text-brand' },
+    { label: 'STORE PRODUCTS', value: stats.totalProducts.toString(), icon: ShoppingBag, color: 'text-brand-dark', bg: 'bg-slate-100', change: 'Database Inventory', changeColor: 'text-blue-500' },
+    { label: 'CUSTOMER REVIEWS', value: stats.totalReviews.toString(), icon: Star, color: 'text-amber-500', bg: 'bg-amber-50', change: 'Feedback received', changeColor: 'text-amber-500' },
   ];
 
   return (
@@ -94,114 +82,119 @@ export default function Dashboard() {
       <Header title="Dashboard" />
 
       <main className="p-8 space-y-8 max-w-[1240px]">
-        {/* Stat Grid */}
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {statCards.map((stat, i) => (
-            <div key={i} className="bg-white p-6 rounded-2xl border border-slate-200/60 shadow-sm hover:shadow-md transition-all duration-300 group">
-              <div className="flex items-center justify-between mb-4">
-                <div className={cn("p-2.5 rounded-xl transition-colors duration-300", stat.bg, "group-hover:bg-slate-900 group-hover:text-white")}>
-                  <stat.icon className={cn("w-5 h-5", stat.color, "group-hover:text-white")} />
-                </div>
-                <div className={cn("text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md", stat.changeColor, "bg-slate-50")}>
-                  {stat.change.split(' ')[0]}
-                </div>
-              </div>
-              <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">{stat.label}</div>
-              <div className="text-2xl font-black text-slate-900 leading-none tracking-tighter">{stat.value}</div>
-            </div>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Feed */}
-          <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col shadow-sm">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-              <div>
-                <h3 className="font-black text-slate-900 text-base uppercase tracking-tight">Real-time Orders Feed</h3>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Global stream activity</p>
-              </div>
-              <div className="flex items-center gap-2 text-[10px] font-black text-brand bg-slate-900 px-3 py-1.5 rounded-lg uppercase tracking-wider text-white">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Live Syncing
-              </div>
-            </div>
-            
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-50/50">
-                    <th className="px-5 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Order ID</th>
-                    <th className="px-5 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Customer</th>
-                    <th className="px-5 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-right">Amount</th>
-                    <th className="px-5 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {recentOrders.map((order, i) => (
-                    <tr key={i} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="px-5 py-4 text-xs font-mono text-slate-400">#{order.id.slice(0, 8)}</td>
-                      <td className="px-5 py-4">
-                        <div className="text-sm font-bold text-slate-900">{order.customer_name}</div>
-                        <a 
-                          href={`https://wa.me/${order.whatsapp?.replace(/[^0-9]/g, '')}`} 
-                          target="_blank" 
-                          rel="noreferrer"
-                          className="text-[10px] text-brand hover:underline font-bold"
-                        >
-                          {order.whatsapp}
-                        </a>
-                      </td>
-                      <td className="px-5 py-4 text-sm font-black text-slate-900 text-right">{formatCurrency(order.price)}</td>
-                      <td className="px-5 py-4 text-center">
-                        <span className={cn(
-                          "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
-                          order.status === 'confirmed' 
-                            ? "bg-emerald-100 text-emerald-700" 
-                            : order.status === 'completed'
-                              ? "bg-slate-100 text-slate-500"
-                              : "bg-amber-100 text-amber-700"
-                        )}>
-                          {order.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                  {recentOrders.length === 0 && (
-                    <tr>
-                      <td colSpan={4} className="px-5 py-12 text-center text-slate-400 text-sm italic">
-                        No orders yet.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+        {loading ? (
+          <div className="flex items-center justify-center h-64">
+            <Loader2 className="w-8 h-8 text-brand animate-spin" />
           </div>
-
-          {/* Sidebar Modules */}
-          <div className="space-y-6">
-            {/* Banner Module */}
-            <div className="bg-white rounded-xl border border-slate-200 p-5">
-              <h3 className="text-sm font-black text-slate-900 mb-4">Banner Sync</h3>
-              <div className="grid grid-cols-2 gap-3 mb-4">
-                <div className="aspect-video bg-slate-50 rounded-lg border-2 border-dashed border-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-400">
-                  Slot 1
+        ) : (
+          <>
+            {/* Stat Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {statCards.map((stat, i) => (
+                <div key={i} className="bg-white p-6 rounded-2xl border border-slate-200/60 shadow-sm hover:shadow-md transition-all duration-300 group">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className={cn("p-2.5 rounded-xl transition-colors duration-300", stat.bg, "group-hover:bg-slate-900 group-hover:text-white")}>
+                      <stat.icon className={cn("w-5 h-5", stat.color, "group-hover:text-white")} />
+                    </div>
+                    <div className={cn("text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md", stat.changeColor, "bg-slate-50")}>
+                      STATUS
+                    </div>
+                  </div>
+                  <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">{stat.label}</div>
+                  <div className="text-2xl font-black text-slate-900 leading-none tracking-tighter">{stat.value}</div>
+                  <p className="text-[10px] font-bold text-slate-400 mt-4 flex items-center gap-1.5 uppercase tracking-wider">
+                     {stat.change}
+                  </p>
                 </div>
-                <div className="aspect-video bg-indigo-50 rounded-lg border border-indigo-100 flex items-center justify-center relative overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 to-purple-500 opacity-20" />
-                  <span className="text-[10px] font-bold text-brand z-10">Active</span>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Main Feed */}
+              <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col shadow-sm">
+                <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                  <div>
+                    <h3 className="font-black text-slate-900 text-base uppercase tracking-tight">Real-time Orders Feed</h3>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Global stream activity from Firestore</p>
+                  </div>
+                  <div className="flex items-center gap-2 text-[10px] font-black text-brand bg-slate-900 px-3 py-1.5 rounded-lg uppercase tracking-wider text-white">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Live Syncing
+                  </div>
+                </div>
+                
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50/50">
+                        <th className="px-5 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Order ID</th>
+                        <th className="px-5 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Customer</th>
+                        <th className="px-5 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-right">Amount</th>
+                        <th className="px-5 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {recentOrders.map((order, i) => (
+                        <tr key={i} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="px-5 py-4 text-xs font-mono text-slate-400">#{order.id.slice(0, 8)}</td>
+                          <td className="px-5 py-4">
+                            <div className="text-sm font-bold text-slate-900">{order.customer_name}</div>
+                            <div className="text-[10px] text-slate-400 font-bold">
+                              {order.whatsapp_number}
+                            </div>
+                          </td>
+                          <td className="px-5 py-4 text-sm font-black text-slate-900 text-right">{formatCurrency(order.price)}</td>
+                          <td className="px-5 py-4 text-center">
+                            <span className={cn(
+                              "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
+                              order.status === 'delivered' ? "bg-emerald-100 text-emerald-700" :
+                              order.status === 'pending' ? "bg-amber-100 text-amber-700" :
+                              order.status === 'cancelled' ? "bg-red-100 text-red-700" :
+                              "bg-indigo-100 text-indigo-700"
+                            )}>
+                              {order.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                      {recentOrders.length === 0 && (
+                        <tr>
+                          <td colSpan={4} className="px-5 py-12 text-center text-slate-400 text-sm italic font-bold uppercase tracking-widest">
+                            No orders detected in data stream.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </div>
-              <div className="space-y-2">
-                <div className="bg-slate-50 rounded-lg p-2 border border-slate-100 flex items-center justify-between">
-                   <div className="text-[10px] font-bold text-slate-400">PROMO_BANNER_01.JPG</div>
-                   <button className="text-red-500 text-xs px-1 font-black">×</button>
+
+              {/* Sidebar Modules */}
+              <div className="space-y-6">
+                <div className="bg-white rounded-xl border border-slate-200 p-6">
+                   <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-4">Infrastructure Status</h3>
+                   <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Firestore Status</span>
+                         <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                            Operational
+                         </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Security Rules</span>
+                         <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest">Enforced</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Region</span>
+                         <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Multi-Region</span>
+                      </div>
+                   </div>
                 </div>
               </div>
             </div>
-
-          </div>
-        </div>
+          </>
+        )}
       </main>
     </div>
   );

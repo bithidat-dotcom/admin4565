@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { collection, onSnapshot, query, orderBy, addDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { Banner } from '../types';
 import Header from '../components/Header';
 import Modal from '../components/Modal';
@@ -9,29 +10,28 @@ export default function BannersPage() {
   const [banners, setBanners] = useState<Banner[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [title, setTitle] = useState('');
   const [newImageUrl, setNewImageUrl] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchBanners();
-  }, []);
-
-  const fetchBanners = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('banners')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setBanners(data || []);
-    } catch (err) {
-      console.error('Error fetching banners:', err);
-    } finally {
+    const q = query(collection(db, 'banners'), orderBy('created_at', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const bannersData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        created_at: doc.data().created_at?.toDate?.()?.toISOString() || new Date().toISOString()
+      })) as Banner[];
+      setBanners(bannersData);
       setLoading(false);
-    }
-  };
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'banners');
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const handleAddBanner = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,17 +39,17 @@ export default function BannersPage() {
     
     setSubmitting(true);
     try {
-      const { error } = await supabase
-        .from('banners')
-        .insert([{ image: newImageUrl }]);
+      await addDoc(collection(db, 'banners'), {
+        title: title || 'Untitled Banner',
+        image: newImageUrl,
+        created_at: serverTimestamp()
+      });
       
-      if (error) throw error;
-      await fetchBanners();
       setIsModalOpen(false);
       setNewImageUrl('');
-    } catch (err) {
-      console.error('Error adding banner:', err);
-      alert('Failed to add banner');
+      setTitle('');
+    } catch (err: any) {
+      handleFirestoreError(err, OperationType.CREATE, 'banners');
     } finally {
       setSubmitting(false);
     }
@@ -60,15 +60,9 @@ export default function BannersPage() {
     
     setDeletingId(id);
     try {
-      const { error } = await supabase
-        .from('banners')
-        .delete()
-        .eq('id', id);
-      
-      if (error) throw error;
-      setBanners(banners.filter(b => b.id !== id));
+      await deleteDoc(doc(db, 'banners', id));
     } catch (err) {
-      console.error('Error deleting banner:', err);
+      handleFirestoreError(err, OperationType.DELETE, `banners/${id}`);
     } finally {
       setDeletingId(null);
     }
@@ -92,7 +86,7 @@ export default function BannersPage() {
               >
                 <div className="aspect-[21/9] bg-slate-50 overflow-hidden flex items-center justify-center relative">
                   {banner.image ? (
-                    <img src={banner.image} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000" />
+                    <img src={banner.image} alt={banner.title} referrerPolicy="no-referrer" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000" />
                   ) : (
                     <ImageIcon className="w-12 h-12 text-slate-200" />
                   )}
@@ -112,7 +106,7 @@ export default function BannersPage() {
                 <div className="p-5 flex items-center justify-between bg-white">
                   <div>
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">
-                      Promotional Slot
+                      {banner.title || 'Promotional Slot'}
                     </p>
                     <p className="text-xs font-bold text-slate-600">
                       Sync ID: {banner.id.slice(0, 12)}
@@ -145,6 +139,16 @@ export default function BannersPage() {
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Provision New Banner">
         <form onSubmit={handleAddBanner} className="space-y-6">
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Banner Title</label>
+            <input
+              type="text"
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all text-sm font-medium"
+              placeholder="e.g., Summer Sale"
+            />
+          </div>
           <div className="space-y-2">
             <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Global Asset URL</label>
             <input

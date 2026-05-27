@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, ShoppingBag, ShoppingCart, Image as ImageIcon, ChevronRight, History } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, ShoppingCart, Image as ImageIcon, ChevronRight, Star } from 'lucide-react';
 import { View } from '../types';
 import { cn } from '../lib/utils';
 
@@ -13,8 +13,8 @@ export default function Sidebar({ currentView, onViewChange }: SidebarProps) {
     { id: 'dashboard' as View, icon: LayoutDashboard, label: 'Dashboard' },
     { id: 'products' as View, icon: ShoppingBag, label: 'Products' },
     { id: 'orders' as View, icon: ShoppingCart, label: 'Orders' },
-    { id: 'history' as View, icon: History, label: 'History' },
     { id: 'banners' as View, icon: ImageIcon, label: 'Banners' },
+    { id: 'reviews' as View, icon: Star, label: 'Reviews' },
   ];
 
   return (
@@ -24,7 +24,7 @@ export default function Sidebar({ currentView, onViewChange }: SidebarProps) {
           BAZER<span className="text-brand">_BD</span>
         </h1>
         <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1 pr-1">
-          Admin Control v2.5
+          Admin Control v3.0
         </div>
       </div>
 
@@ -53,7 +53,7 @@ export default function Sidebar({ currentView, onViewChange }: SidebarProps) {
             {item.id === 'orders' && (
               <span className={cn(
                 "text-[8px] px-1.5 py-0.5 rounded-md font-black uppercase tracking-tighter",
-                currentView === item.id ? "bg-brand text-white" : "bg-red-500 text-white"
+                currentView === item.id ? "bg-brand text-white" : "bg-emerald-500 text-white"
               )}>
                 Live
               </span>
@@ -69,7 +69,7 @@ export default function Sidebar({ currentView, onViewChange }: SidebarProps) {
             <div className="w-4 h-4 rounded bg-slate-100 flex items-center justify-center group-hover:bg-brand transition-colors">
               <ChevronRight className="w-3 h-3 text-slate-400 group-hover:text-white" />
             </div>
-            RLS Policy
+            Firestore Rules
           </div>
         </button>
       </nav>

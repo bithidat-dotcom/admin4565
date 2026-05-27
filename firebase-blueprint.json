@@ -1,0 +1,76 @@
+{
+  "entities": {
+    "Product": {
+      "title": "Product",
+      "description": "A product for sale in the store",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Name of the product" },
+        "price": { "type": "number", "description": "Price of the product" },
+        "description": { "type": "string", "description": "Detailed description" },
+        "image": { "type": "string", "description": "Main thumbnail image URL" },
+        "images": { "type": "array", "items": { "type": "string" }, "description": "Gallery of product images" },
+        "discount": { "type": "number", "description": "Discount amount or percentage" },
+        "seller": { "type": "string", "description": "Name of the seller" },
+        "created_at": { "type": "string", "format": "date-time", "description": "Creation timestamp" }
+      },
+      "required": ["name", "price", "description", "image"]
+    },
+    "Banner": {
+      "title": "Banner",
+      "description": "Promotional banner",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Title of the banner" },
+        "image": { "type": "string", "description": "Image URL of the banner" }
+      },
+      "required": ["title", "image"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Shipment/Order record",
+      "type": "object",
+      "properties": {
+        "customer_name": { "type": "string", "description": "Name of the customer" },
+        "whatsapp_number": { "type": "string", "description": "WhatsApp contact number" },
+        "location": { "type": "string", "description": "Delivery location" },
+        "price": { "type": "number", "description": "Order total price" },
+        "product_details": { "type": "string", "description": "Details of the ordered products" },
+        "status": { "type": "string", "description": "Order status", "enum": ["pending", "processing", "shipped", "delivered", "cancelled"] },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["customer_name", "price", "status"]
+    },
+    "Review": {
+      "title": "Review",
+      "description": "Customer product review",
+      "type": "object",
+      "properties": {
+        "customer_name": { "type": "string", "description": "Name of the reviewer" },
+        "rating": { "type": "number", "minimum": 1, "maximum": 5, "description": "Rating out of 5" },
+        "comment": { "type": "string", "description": "Review text" },
+        "product_name": { "type": "string", "description": "Name of the product being reviewed" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["customer_name", "rating", "comment"]
+    }
+  },
+  "firestore": {
+    "/products": {
+      "schema": "Product",
+      "description": "Store products"
+    },
+    "/banners": {
+      "schema": "Banner",
+      "description": "Store promotional banners"
+    },
+    "/orders": {
+      "schema": "Order",
+      "description": "Store customer orders"
+    },
+    "/reviews": {
+      "schema": "Review",
+      "description": "Product reviews"
+    }
+  }
+}

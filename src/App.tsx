@@ -3,8 +3,8 @@ import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import ProductsPage from './components/ProductsPage';
 import OrdersPage from './components/OrdersPage';
-import HistoryPage from './components/HistoryPage';
 import BannersPage from './components/BannersPage';
+import ReviewsPage from './components/ReviewsPage';
 import LoginPage from './components/LoginPage';
 import { View } from './types';
 import { motion, AnimatePresence } from 'motion/react';
@@ -37,10 +37,10 @@ export default function App() {
         return <ProductsPage />;
       case 'orders':
         return <OrdersPage />;
-      case 'history':
-        return <HistoryPage />;
       case 'banners':
         return <BannersPage />;
+      case 'reviews':
+        return <ReviewsPage />;
       default:
         return <Dashboard />;
     }

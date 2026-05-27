@@ -1,0 +1,27 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // All collections are public for this standalone dashboard as requested
+    
+    match /products/{id} {
+      allow read, write: if true;
+    }
+    
+    match /banners/{id} {
+      allow read, write: if true;
+    }
+    
+    match /orders/{id} {
+      allow read, write: if true;
+    }
+
+    match /reviews/{id} {
+      allow read, write: if true;
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

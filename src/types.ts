@@ -6,48 +6,35 @@ export interface Product {
   image: string;
   images: string[];
   discount: number;
-  created_at: string;
-  type?: string;
   seller?: string;
+  created_at: string;
 }
 
 export interface Order {
   id: string;
   customer_name: string;
-  whatsapp: string;
+  whatsapp_number: string;
   location: string;
-  product_name: string;
   price: number;
-  status: 'pending' | 'confirmed';
+  product_details: string;
+  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
   created_at: string;
 }
 
 export interface Banner {
   id: string;
+  title: string;
   image: string;
   created_at: string;
 }
 
-export interface ProductHistoryEntry {
+export interface Review {
   id: string;
-  product_id: string;
-  product_name: string;
-  action: 'CREATED' | 'UPDATED' | 'DELETED';
-  changed_data: {
-    price?: number;
-    type?: string;
-    seller?: string;
-    discount?: number;
-    old_price?: number;
-    new_price?: number;
-    old_type?: string;
-    new_type?: string;
-    old_seller?: string;
-    new_seller?: string;
-    old_discount?: number;
-    new_discount?: number;
-  };
-  changed_at: string;
+  customer_name: string;
+  rating: number;
+  comment: string;
+  product_name?: string;
+  created_at: string;
 }
 
-export type View = 'dashboard' | 'products' | 'orders' | 'banners' | 'history';
+export type View = 'dashboard' | 'products' | 'orders' | 'banners' | 'reviews';
