@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, ShoppingBag, ShoppingCart, Image as ImageIcon, ChevronRight, Star, Users, X } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, ShoppingCart, Image as ImageIcon, ChevronRight, Star, Users, X, Link as LinkIcon } from 'lucide-react';
 import { View } from '../types';
 import { cn } from '../lib/utils';
 
@@ -53,7 +53,7 @@ export default function Sidebar({ currentView, onViewChange, isOpen = false, onC
           </button>
         </div>
 
-      <nav className="flex-1 p-4 space-y-1.5 mt-6">
+      <nav className="flex-1 p-4 space-y-1.5 mt-6 overflow-y-auto">
         <div className="px-4 mb-2 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
           Store Management
         </div>
@@ -65,7 +65,7 @@ export default function Sidebar({ currentView, onViewChange, isOpen = false, onC
               onClose();
             }}
             className={cn(
-              "w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300 group",
+              "w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300 group cursor-pointer",
               currentView === item.id
                 ? "bg-slate-900 text-white shadow-lg shadow-slate-200"
                 : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
@@ -88,6 +88,26 @@ export default function Sidebar({ currentView, onViewChange, isOpen = false, onC
             )}
           </button>
         ))}
+
+        <div className="px-4 pt-4 mb-2 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
+          Utilities
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            window.dispatchEvent(new CustomEvent('open-link-converter'));
+            onClose();
+          }}
+          className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-black uppercase tracking-widest text-slate-500 hover:bg-slate-50 hover:text-indigo-600 transition-all duration-300 group cursor-pointer"
+        >
+          <div className="flex items-center gap-3">
+            <LinkIcon className="w-4 h-4 text-slate-400 group-hover:text-brand animate-pulse" />
+            Link Converter
+          </div>
+          <span className="text-[8px] px-1.5 py-0.5 rounded-md font-black uppercase tracking-tighter bg-indigo-55 text-indigo-600 border border-indigo-150">
+            Tool
+          </span>
+        </button>
       </nav>
 
       <div className="p-6 border-t border-slate-100 bg-slate-50/50">

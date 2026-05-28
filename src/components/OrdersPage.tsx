@@ -4,11 +4,12 @@ import { collection, onSnapshot, query, orderBy, updateDoc, deleteDoc, doc, wher
 import { Order } from '../types';
 import Header from '../components/Header';
 import Modal from './Modal';
-import { Loader2, Phone, MapPin, Package, Clock, CheckCircle, Search, Trash2 } from 'lucide-react';
+import { Loader2, Phone, MapPin, Package, Clock, CheckCircle, Search, Trash2, ShieldCheck, Lock, Copy, Check, MessageSquare } from 'lucide-react';
 import { formatCurrency, cn } from '../lib/utils';
 import { format, isSameDay } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
 import { Calendar } from 'lucide-react';
+import { decryptData, encryptData } from '../lib/security';
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -19,6 +20,13 @@ export default function OrdersPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const handleCopy = (id: string, text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
 
   // Safe Non-Blocking Confirmation States
   const [orderToDelete, setOrderToDelete] = useState<string | null>(null);
@@ -27,11 +35,18 @@ export default function OrdersPage() {
     const q = query(collection(db, 'orders'), orderBy('created_at', 'desc'));
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const ordersData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        created_at: doc.data().created_at?.toDate?.()?.toISOString() || new Date().toISOString()
-      })) as Order[];
+      const ordersData = snapshot.docs.map(doc => {
+        const rawData = doc.data();
+        return {
+          id: doc.id,
+          ...rawData,
+          customer_name: decryptData(rawData.customer_name),
+          whatsapp_number: decryptData(rawData.whatsapp_number),
+          location: decryptData(rawData.location),
+          product_details: decryptData(rawData.product_details),
+          created_at: rawData.created_at?.toDate?.()?.toISOString() || new Date().toISOString()
+        };
+      }) as Order[];
       
       setOrders(ordersData);
       setLoading(false);
@@ -102,28 +117,6 @@ export default function OrdersPage() {
         setTimeout(() => {
           syncUserStats(updatedOrder.whatsapp_number);
         }, 500);
-      }
-
-      // Automatically adjust product inventory stock & sold figures in Firestore upon order completion
-      if (newStatus === 'completed' && updatedOrder && updatedOrder.product_name) {
-        try {
-          const product_name = updatedOrder.product_name;
-          const quantity = Number(updatedOrder.quantity) || 1;
-          const pQuery = query(collection(db, 'products'), where('name', '==', product_name));
-          const pSnapshot = await getDocs(pQuery);
-          if (!pSnapshot.empty) {
-            const pDoc = pSnapshot.docs[0];
-            const currentStock = pDoc.data().stock ?? 20;
-            const currentSold = pDoc.data().sold ?? 0;
-            await updateDoc(pDoc.ref, {
-              stock: Math.max(0, currentStock - quantity),
-              sold: currentSold + quantity
-            });
-            console.log(`Auto adjusted product [${product_name}] stock: -${quantity}, sold: +${quantity}`);
-          }
-        } catch (itemErr) {
-          console.error("Failed to automatically update product inventory states:", itemErr);
-        }
       }
     } catch (err: any) {
       handleFirestoreError(err, OperationType.UPDATE, `orders/${id}`);
@@ -254,6 +247,8 @@ export default function OrdersPage() {
           </div>
         </div>
 
+
+
         {loading ? (
           <div className="flex items-center justify-center h-64">
             <Loader2 className="w-8 h-8 text-brand animate-spin" />
@@ -307,10 +302,34 @@ export default function OrdersPage() {
                             </span>
                           </div>
                           <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                            <div className="flex items-center gap-2 text-slate-600">
-                              <Phone className="w-4 h-4" />
-                              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mr-1">Contact Hub:</span>
-                              <span>{order.whatsapp_number}</span>
+                            <div className="flex items-center gap-2 text-slate-600 flex-wrap">
+                              <Phone className="w-4 h-4 text-emerald-500 shrink-0" />
+                              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Contact Hub:</span>
+                              <span className="text-slate-900 font-bold tracking-normal">{order.whatsapp_number}</span>
+                              <div className="flex items-center gap-1.5 ml-2">
+                                <button
+                                  onClick={() => handleCopy(order.id, order.whatsapp_number)}
+                                  className="p-1 text-slate-400 hover:text-brand hover:bg-slate-100 rounded transition-all cursor-pointer"
+                                  title="Copy Number"
+                                >
+                                  {copiedId === order.id ? (
+                                    <Check className="w-3.5 h-3.5 text-emerald-500 animate-bounce" />
+                                  ) : (
+                                    <Copy className="w-3.5 h-3.5" />
+                                  )}
+                                </button>
+                                {order.whatsapp_number && (
+                                  <a
+                                    href={`https://wa.me/${order.whatsapp_number.replace(/[^0-9]/g, '').startsWith('01') ? '88' + order.whatsapp_number.replace(/[^0-9]/g, '') : order.whatsapp_number.replace(/[^0-9]/g, '')}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="p-1 text-emerald-500 hover:bg-emerald-50 rounded transition-all flex items-center justify-center cursor-pointer"
+                                    title="Open WhatsApp Chat"
+                                  >
+                                    <MessageSquare className="w-3.5 h-3.5" />
+                                  </a>
+                                )}
+                              </div>
                             </div>
                             <span className="flex items-center gap-2">
                               <MapPin className="w-4 h-4 text-slate-400" />

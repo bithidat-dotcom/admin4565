@@ -41,6 +41,60 @@ const categoryFilters = [
   { name: 'Grocery', icon: ShoppingBasket },
 ];
 
+function DiscountTimer({ expiresAt }: { expiresAt: string }) {
+  const [timeLeft, setTimeLeft] = useState<string>('');
+
+  useEffect(() => {
+    if (!expiresAt) return;
+
+    const updateTimer = () => {
+      const now = new Date().getTime();
+      const target = new Date(expiresAt).getTime();
+      const diff = target - now;
+
+      if (isNaN(target)) {
+        setTimeLeft('');
+        return;
+      }
+
+      if (diff <= 0) {
+        setTimeLeft('Discount Expired');
+      } else {
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+        let str = '';
+        if (days > 0) str += `${days}d `;
+        str += `${hours.toString().padStart(2, '0')}h ${minutes.toString().padStart(2, '0')}m ${seconds.toString().padStart(2, '0')}s`;
+        setTimeLeft(str);
+      }
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [expiresAt]);
+
+  if (!timeLeft) return null;
+  
+  if (timeLeft === 'Discount Expired') {
+    return (
+      <div className="mt-2 text-[9px] font-black text-rose-500 bg-rose-50/80 px-2 py-0.5 rounded border border-rose-100 uppercase tracking-widest inline-block select-none font-mono">
+        ⏳ Sale Ended
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-2 flex items-center gap-1.5 text-[9px] font-black text-indigo-700 bg-indigo-50/80 px-2.5 py-1 rounded border border-indigo-100 animate-pulse uppercase tracking-wider inline-block select-none font-mono">
+      <span className="w-1.5 h-1.5 bg-indigo-600 rounded-full animate-bounce" />
+      Ends: {timeLeft}
+    </div>
+  );
+}
+
 export default function ProductsPage({ defaultCategory = 'All', onCategoryFilterChange }: ProductsPageProps = {}) {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -60,7 +114,17 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
     seller: '',
     category: 'Food',
     stock: '20',
-    sold: '0'
+    sold: '0',
+    gadgetSpecs: {
+      ram: '',
+      storage: '',
+      refreshRate: '',
+      battery: '',
+      watt: '',
+      amp: ''
+    },
+    discountExpiresAt: '',
+    discountType: 'permanent' as 'permanent' | 'timer'
   });
 
   const [newImageUrl, setNewImageUrl] = useState('');
@@ -113,7 +177,17 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
       seller: '',
       category: 'Food',
       stock: '20',
-      sold: '0'
+      sold: '0',
+      gadgetSpecs: {
+        ram: '',
+        storage: '',
+        refreshRate: '',
+        battery: '',
+        watt: '',
+        amp: ''
+      },
+      discountExpiresAt: '',
+      discountType: 'permanent'
     });
     setEditingProduct(null);
     setNewImageUrl('');
@@ -139,7 +213,17 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
       seller: product.seller || '',
       category: product.category || 'Food',
       stock: (product.stock ?? 20).toString(),
-      sold: (product.sold ?? 0).toString()
+      sold: (product.sold ?? 0).toString(),
+      gadgetSpecs: {
+        ram: product.gadgetSpecs?.ram || '',
+        storage: product.gadgetSpecs?.storage || '',
+        refreshRate: product.gadgetSpecs?.refreshRate || '',
+        battery: product.gadgetSpecs?.battery || '',
+        watt: product.gadgetSpecs?.watt || '',
+        amp: product.gadgetSpecs?.amp || ''
+      },
+      discountExpiresAt: product.discountExpiresAt || '',
+      discountType: product.discountExpiresAt ? 'timer' : 'permanent'
     });
     setIsModalOpen(true);
   };
@@ -214,7 +298,7 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
     e.preventDefault();
     setSubmitting(true);
 
-    const payload = {
+    const payload: any = {
       name: formData.name,
       price: parseFloat(formData.price),
       image: formData.image,
@@ -224,8 +308,19 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
       seller: formData.seller,
       category: formData.category,
       stock: parseInt(formData.stock) || 0,
+      quantity: parseInt(formData.stock) || 0,
+      qty: parseInt(formData.stock) || 0,
       sold: parseInt(formData.sold) || 0,
-      updatedAt: serverTimestamp()
+      updatedAt: serverTimestamp(),
+      gadgetSpecs: formData.category === 'Gadget' ? {
+        ram: formData.gadgetSpecs.ram || '',
+        storage: formData.gadgetSpecs.storage || '',
+        refreshRate: formData.gadgetSpecs.refreshRate || '',
+        battery: formData.gadgetSpecs.battery || '',
+        watt: formData.gadgetSpecs.watt || '',
+        amp: formData.gadgetSpecs.amp || ''
+      } : null,
+      discountExpiresAt: (parseFloat(formData.discount) > 0 && formData.discountType === 'timer') ? formData.discountExpiresAt : ''
     };
 
     try {
@@ -387,6 +482,59 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
                   <p className="text-slate-500 text-xs mt-2 line-clamp-2 min-h-[32px] leading-relaxed">
                     {product.description}
                   </p>
+
+                  {/* Dynamic Countdown Clock Display */}
+                  {product.discount > 0 && product.discountExpiresAt && (
+                    <DiscountTimer expiresAt={product.discountExpiresAt} />
+                  )}
+
+                  {/* Micro Gadget Specs Panel */}
+                  {product.category === 'Gadget' && product.gadgetSpecs && (
+                    <div className="mt-3 bg-slate-900 border border-slate-800 rounded-xl p-3 space-y-2 text-white">
+                      <div className="flex items-center gap-1 text-[8.5px] font-black text-slate-400 uppercase tracking-widest pb-1 border-b border-slate-800/80">
+                        <Smartphone className="w-3.5 h-3.5 text-brand" />
+                        Hardware Specifications
+                      </div>
+                      <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 text-[9.5px]">
+                        {product.gadgetSpecs.ram && (
+                          <div className="flex justify-between items-center bg-slate-800 px-1.5 py-1 rounded border border-slate-700/50">
+                            <span className="text-[7.5px] font-bold text-slate-400 uppercase tracking-wider">RAM</span>
+                            <span className="font-extrabold text-brand truncate max-w-[40px] uppercase">{product.gadgetSpecs.ram}</span>
+                          </div>
+                        )}
+                        {product.gadgetSpecs.storage && (
+                          <div className="flex justify-between items-center bg-slate-800 px-1.5 py-1 rounded border border-slate-700/50">
+                            <span className="text-[7.5px] font-bold text-slate-400 uppercase tracking-wider">ROM</span>
+                            <span className="font-extrabold text-white truncate max-w-[40px] uppercase">{product.gadgetSpecs.storage}</span>
+                          </div>
+                        )}
+                        {product.gadgetSpecs.refreshRate && (
+                          <div className="flex justify-between items-center bg-slate-800 px-1.5 py-1 rounded border border-slate-700/50 col-span-2">
+                            <span className="text-[7.5px] font-bold text-slate-400 uppercase tracking-wider">Refresh</span>
+                            <span className="font-extrabold text-white truncate uppercase">{product.gadgetSpecs.refreshRate}</span>
+                          </div>
+                        )}
+                        {product.gadgetSpecs.battery && (
+                          <div className="flex justify-between items-center bg-slate-800 px-1.5 py-1 rounded border border-slate-700/50 col-span-2">
+                            <span className="text-[7.5px] font-bold text-slate-400 uppercase tracking-wider">Battery</span>
+                            <span className="font-extrabold text-white truncate uppercase">{product.gadgetSpecs.battery}</span>
+                          </div>
+                        )}
+                        {product.gadgetSpecs.watt && (
+                          <div className="flex justify-between items-center bg-slate-800 px-1.5 py-1 rounded border border-slate-700/50">
+                            <span className="text-[7.5px] font-bold text-slate-400 uppercase tracking-wider">Watt</span>
+                            <span className="font-extrabold text-white truncate max-w-[40px] uppercase">{product.gadgetSpecs.watt}</span>
+                          </div>
+                        )}
+                        {product.gadgetSpecs.amp && (
+                          <div className="flex justify-between items-center bg-slate-800 px-1.5 py-1 rounded border border-slate-700/50">
+                            <span className="text-[7.5px] font-bold text-slate-400 uppercase tracking-wider">Amp</span>
+                            <span className="font-extrabold text-white truncate max-w-[40px] uppercase">{product.gadgetSpecs.amp}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                   
                   {/* Stock Status & Units Sold indicators */}
                   <div className="mt-3 flex items-center justify-between gap-2">
@@ -545,7 +693,7 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">Stock Available</label>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">Stock / Quantity Available</label>
               <input
                 required
                 type="number"
@@ -569,6 +717,150 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
               />
             </div>
           </div>
+
+          {/* Conditional Gadget Specs Panel */}
+          {formData.category === 'Gadget' && (
+            <div className="bg-white text-slate-800 p-5 rounded-2xl space-y-4 shadow-sm border border-slate-200">
+              <div className="flex items-center gap-2">
+                <Smartphone className="w-5 h-5 text-brand animate-pulse" />
+                <h4 className="text-[11px] font-black uppercase tracking-widest text-brand">Gadget Specification Sheets (Active)</h4>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">RAM Memory (e.g. 8GB, 12GB)</label>
+                  <input
+                    type="text"
+                    value={formData.gadgetSpecs.ram}
+                    onChange={e => setFormData({ 
+                      ...formData, 
+                      gadgetSpecs: { ...formData.gadgetSpecs, ram: e.target.value } 
+                    })}
+                    className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand text-xs text-slate-900 font-medium transition-all"
+                    placeholder="e.g. 8GB"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Storage Capacity (e.g. 256GB)</label>
+                  <input
+                    type="text"
+                    value={formData.gadgetSpecs.storage}
+                    onChange={e => setFormData({ 
+                      ...formData, 
+                      gadgetSpecs: { ...formData.gadgetSpecs, storage: e.target.value } 
+                    })}
+                    className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand text-xs text-slate-900 font-medium transition-all"
+                    placeholder="e.g. 256GB"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Screen Refresh Rate (Hz)</label>
+                  <input
+                    type="text"
+                    value={formData.gadgetSpecs.refreshRate}
+                    onChange={e => setFormData({ 
+                      ...formData, 
+                      gadgetSpecs: { ...formData.gadgetSpecs, refreshRate: e.target.value } 
+                    })}
+                    className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand text-xs text-slate-900 font-medium transition-all"
+                    placeholder="e.g. 120Hz"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Battery Capacity & Backup</label>
+                  <input
+                    type="text"
+                    value={formData.gadgetSpecs.battery}
+                    onChange={e => setFormData({ 
+                      ...formData, 
+                      gadgetSpecs: { ...formData.gadgetSpecs, battery: e.target.value } 
+                    })}
+                    className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand text-xs text-slate-900 font-medium transition-all"
+                    placeholder="e.g. 5000 mAh / 10 Hours"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Charger Wattage (W)</label>
+                  <input
+                    type="text"
+                    value={formData.gadgetSpecs.watt}
+                    onChange={e => setFormData({ 
+                      ...formData, 
+                      gadgetSpecs: { ...formData.gadgetSpecs, watt: e.target.value } 
+                    })}
+                    className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand text-xs text-slate-900 font-medium transition-all"
+                    placeholder="e.g. 67W / 120W"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Current Amperage (Amp)</label>
+                  <input
+                    type="text"
+                    value={formData.gadgetSpecs.amp}
+                    onChange={e => setFormData({ 
+                      ...formData, 
+                      gadgetSpecs: { ...formData.gadgetSpecs, amp: e.target.value } 
+                    })}
+                    className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand text-xs text-slate-900 font-medium transition-all"
+                    placeholder="e.g. 3A / 5A"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Conditional Discount Expiration Timer Select */}
+          {parseFloat(formData.discount) > 0 && (
+            <div className="bg-rose-50/50 p-5 rounded-2xl border border-rose-100 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="space-y-1">
+                  <h5 className="text-xs font-black text-rose-950 uppercase tracking-wider">Discount Mode</h5>
+                  <p className="text-xs text-slate-500 leading-normal">Choose if this discount has a time limit or stays persistent.</p>
+                </div>
+                <div className="flex gap-2 p-1 bg-rose-100/50 rounded-xl max-w-fit">
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, discountType: 'permanent', discountExpiresAt: '' })}
+                    className={cn(
+                      "px-3.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all",
+                      formData.discountType === 'permanent'
+                        ? "bg-rose-600 text-white shadow-sm"
+                        : "text-rose-950 hover:bg-rose-100"
+                    )}
+                  >
+                    Non-Timer
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, discountType: 'timer' })}
+                    className={cn(
+                      "px-3.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all",
+                      formData.discountType === 'timer'
+                        ? "bg-rose-600 text-white shadow-sm"
+                        : "text-rose-950 hover:bg-rose-100"
+                    )}
+                  >
+                    Timer Limit
+                  </button>
+                </div>
+              </div>
+
+              {formData.discountType === 'timer' && (
+                <div className="pt-3 border-t border-rose-100/60 flex flex-col md:flex-row gap-4 items-center justify-between">
+                  <div className="space-y-1 text-center md:text-left">
+                    <h5 className="text-xs font-black text-rose-950 uppercase tracking-wider">Flash Sale Countdown Timer</h5>
+                    <p className="text-xs text-slate-500 leading-normal">Specify the exact target date and time when this discount percentage ends.</p>
+                  </div>
+                  <input
+                    type="datetime-local"
+                    required
+                    value={formData.discountExpiresAt}
+                    onChange={e => setFormData({ ...formData, discountExpiresAt: e.target.value })}
+                    className="w-full md:w-auto px-4 py-3 rounded-xl bg-white border border-rose-200 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 text-sm font-semibold text-rose-800 cursor-pointer"
+                  />
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="space-y-1.5">
             <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Detailed Description</label>

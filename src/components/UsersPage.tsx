@@ -4,9 +4,10 @@ import { collection, onSnapshot, query, orderBy, deleteDoc, doc, where, updateDo
 import { User, Order, View } from '../types';
 import Header from '../components/Header';
 import Modal from '../components/Modal';
-import { Users, Trash2, Loader2, Phone, MapPin, Mail, Calendar, Hash, ExternalLink, Package, Coins } from 'lucide-react';
+import { Users, Trash2, Loader2, Phone, MapPin, Mail, Calendar, Hash, ExternalLink, Package, Coins, ShieldCheck, Lock, Copy, Check, MessageSquare } from 'lucide-react';
 import { cn, formatCurrency } from '../lib/utils';
 import { format } from 'date-fns';
+import { decryptData, encryptData } from '../lib/security';
 
 interface UsersPageProps {
   onViewChange?: (view: View) => void;
@@ -14,12 +15,20 @@ interface UsersPageProps {
 
 export default function UsersPage({ onViewChange }: UsersPageProps) {
   const [users, setUsers] = useState<User[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [userOrders, setUserOrders] = useState<Order[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const handleCopy = (id: string, text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
 
   // Manual Balance Adjustment States
   const [selectedUserForBalance, setSelectedUserForBalance] = useState<User | null>(null);
@@ -44,23 +53,142 @@ export default function UsersPage({ onViewChange }: UsersPageProps) {
   };
 
   useEffect(() => {
-    const q = query(collection(db, 'users'), orderBy('created_at', 'desc'));
+    setLoading(true);
     
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const usersData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        created_at: doc.data().created_at?.toDate?.()?.toISOString() || doc.data().created_at || new Date().toISOString()
-      })) as User[];
-      
-      setUsers(usersData);
-      setLoading(false);
+    // Listen to registered users
+    const unsubUsers = onSnapshot(collection(db, 'users'), (usersSnap) => {
+      const usersList = usersSnap.docs.map(doc => {
+        const rawData = doc.data();
+        let resolvedDate = new Date().toISOString();
+        if (rawData.created_at) {
+          resolvedDate = typeof rawData.created_at.toDate === 'function' 
+            ? rawData.created_at.toDate().toISOString() 
+            : String(rawData.created_at);
+        } else if (rawData.createdAt) {
+          resolvedDate = typeof rawData.createdAt.toDate === 'function'
+            ? rawData.createdAt.toDate().toISOString()
+            : String(rawData.createdAt);
+        } else if (rawData.last_login) {
+          resolvedDate = typeof rawData.last_login.toDate === 'function'
+            ? rawData.last_login.toDate().toISOString()
+            : String(rawData.last_login);
+        }
+
+        return {
+          id: doc.id,
+          ...rawData,
+          name: decryptData(rawData.name || rawData.displayName || rawData.userName || '').trim(),
+          whatsapp_number: decryptData(rawData.whatsapp_number || rawData.phone || rawData.phoneNumber || '').trim(),
+          location: decryptData(rawData.location || rawData.address || '').trim(),
+          email: decryptData(rawData.email || rawData.emailAddress || '').trim(),
+          created_at: resolvedDate,
+          isGuest: false
+        };
+      });
+
+      // Listen to orders
+      const unsubOrders = onSnapshot(collection(db, 'orders'), (ordersSnap) => {
+        const ordersList = ordersSnap.docs.map(doc => {
+          const rawData = doc.data();
+          return {
+            id: doc.id,
+            ...rawData,
+            customer_name: decryptData(rawData.customer_name).trim(),
+            whatsapp_number: decryptData(rawData.whatsapp_number).trim(),
+            location: decryptData(rawData.location).trim(),
+            product_details: decryptData(rawData.product_details).trim(),
+            product_name: rawData.product_name || '',
+            created_at: rawData.created_at?.toDate?.()?.toISOString() || rawData.created_at || new Date().toISOString()
+          };
+        }) as Order[];
+
+        setOrders(ordersList);
+
+        // Process unified users list
+        const processedUsers: any[] = [...usersList];
+        
+        // Find orders by unique whatsapp numbers to see if we should:
+        // A) Correct registered user names/locations that are "Anonymous" or empty
+        // B) Create guest user entries for orders containing unregistered whatsapp numbers
+        const uniqueOrderWhatsapps = Array.from(new Set(ordersList.map(o => o.whatsapp_number).filter(Boolean)));
+
+        uniqueOrderWhatsapps.forEach(phone => {
+          const phoneOrders = ordersList.filter(o => o.whatsapp_number === phone);
+          const completedOrders = phoneOrders.filter(o => o.status === 'completed');
+          const totalSpent = completedOrders.reduce((sum, o) => sum + (Number(o.price) || 0), 0);
+          
+          // Get the most recent order to extract user details
+          const latestOrder = phoneOrders[0];
+          const latestName = latestOrder?.customer_name || '';
+          const latestLoc = latestOrder?.location || '';
+          const earliestDate = phoneOrders[phoneOrders.length - 1]?.created_at || new Date().toISOString();
+
+          // Find matching registered user
+          const matchingRegIdx = processedUsers.findIndex(u => u.whatsapp_number === phone);
+
+          if (matchingRegIdx !== -1) {
+            const regUser = processedUsers[matchingRegIdx];
+            if (!regUser.name || regUser.name === 'Anonymous User' || regUser.name === 'Anonymous' || regUser.name === '') {
+              regUser.name = latestName || 'Customer (' + phone.slice(-4) + ')';
+            }
+            if (!regUser.location || regUser.location === 'N/A' || regUser.location === '') {
+              regUser.location = latestLoc || 'N/A';
+            }
+            // Enhance registered user statistics with aggregated order stats
+            regUser.total_orders = phoneOrders.length;
+            regUser.total_spent = totalSpent;
+          } else {
+            // Synthesize a Guest User Profile
+            const guestName = latestName || 'Customer (' + phone.slice(-4) + ')';
+            processedUsers.push({
+              id: `guest-${phone.replace(/[^a-zA-Z0-9]/g, '') || Math.random().toString(36).substring(4)}`,
+              name: guestName,
+              whatsapp_number: phone,
+              location: latestLoc || 'N/A',
+              email: 'N/A',
+              total_orders: phoneOrders.length,
+              total_spent: totalSpent,
+              wallet_balance: Math.round(totalSpent * 0.10), // 10% cash back
+              created_at: earliestDate,
+              isGuest: true
+            });
+          }
+        });
+
+        // Final sanitation check to make absolutely sure no names are blank or Anonymous
+        const finalUsers = processedUsers.map(u => {
+          let cleanName = u.name;
+          if (!cleanName || cleanName === 'Anonymous User' || cleanName === 'Anonymous' || cleanName === 'N/A') {
+            const matchingOrder = ordersList.find(o => o.whatsapp_number === u.whatsapp_number);
+            cleanName = matchingOrder?.customer_name || 'Customer (' + (u.whatsapp_number || '').slice(-4) + ')';
+          }
+          return {
+            ...u,
+            name: cleanName
+          };
+        });
+
+        // Sort chronologically in memory (most recent created or order first)
+        finalUsers.sort((a, b) => {
+          const dateA = new Date(a.created_at || 0).getTime();
+          const dateB = new Date(b.created_at || 0).getTime();
+          return dateB - dateA;
+        });
+
+        setUsers(finalUsers);
+        setLoading(false);
+      }, (error) => {
+        handleFirestoreError(error, OperationType.LIST, 'orders');
+        setLoading(false);
+      });
+
+      return () => unsubOrders();
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'users');
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => unsubUsers();
   }, []);
 
   const confirmDeleteUser = async () => {
@@ -109,6 +237,8 @@ export default function UsersPage({ onViewChange }: UsersPageProps) {
       <Header title="Customer Profiles" />
 
       <main className="p-4 md:p-8">
+
+
         {loading ? (
           <div className="flex items-center justify-center h-64">
             <Loader2 className="w-8 h-8 text-brand animate-spin" />
@@ -122,34 +252,62 @@ export default function UsersPage({ onViewChange }: UsersPageProps) {
               >
                 <div className="flex items-start justify-between mb-6">
                   <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center font-black text-slate-400 text-2xl">
+                    <div className="w-16 h-16 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center font-black text-slate-400 text-2xl uppercase">
                       {user.name?.charAt(0) || '?'}
                     </div>
                     <div>
                       <h3 className="font-black text-slate-900 text-lg uppercase tracking-tight">{user.name || 'Anonymous User'}</h3>
                       <div className="flex items-center gap-2 mt-1">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Registered Customer</span>
+                        <span className={cn("w-2 h-2 rounded-full animate-pulse", user.isGuest ? "bg-amber-500" : "bg-emerald-500")} />
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">
+                          {user.isGuest ? 'Guest Customer' : 'Registered Customer'}
+                        </span>
                       </div>
                     </div>
                   </div>
-                  <button
-                    onClick={() => setUserToDelete(user.id)}
-                    className="p-2 text-slate-400 md:text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                  </button>
+                  {!user.isGuest && (
+                    <button
+                      onClick={() => setUserToDelete(user.id)}
+                      className="p-2 text-slate-400 md:text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-3">
                     <div className="flex items-center gap-3 text-slate-600">
-                      <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center text-brand shrink-0">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
                         <Phone className="w-4 h-4" />
                       </div>
-                      <div className="overflow-hidden">
+                      <div className="overflow-hidden flex-1">
                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Contact Number</p>
-                        <p className="font-bold text-sm truncate">{user.whatsapp_number}</p>
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <p className="font-bold text-sm truncate text-slate-900">{user.whatsapp_number}</p>
+                          <button
+                            onClick={() => handleCopy(user.id, user.whatsapp_number)}
+                            className="p-1 text-slate-400 hover:text-brand hover:bg-slate-100 rounded transition-all cursor-pointer shrink-0"
+                            title="Copy Number"
+                          >
+                            {copiedId === user.id ? (
+                              <Check className="w-3.5 h-3.5 text-emerald-500 animate-bounce" />
+                            ) : (
+                              <Copy className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                          {user.whatsapp_number && (
+                            <a
+                              href={`https://wa.me/${user.whatsapp_number.replace(/[^0-9]/g, '').startsWith('01') ? '88' + user.whatsapp_number.replace(/[^0-9]/g, '') : user.whatsapp_number.replace(/[^0-9]/g, '')}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="p-1 text-emerald-500 hover:bg-emerald-50 rounded transition-all flex items-center justify-center cursor-pointer shrink-0"
+                              title="Open WhatsApp Chat"
+                            >
+                              <MessageSquare className="w-3.5 h-3.5" />
+                            </a>
+                          )}
+                        </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-3 text-slate-600">
@@ -192,7 +350,7 @@ export default function UsersPage({ onViewChange }: UsersPageProps) {
                       <span className="font-black text-lg">৳</span>
                     </div>
                     <div>
-                      <p className="text-[9px] font-black text-emerald-600 uppercase tracking-[0.15em]">Savings Wallet</p>
+                      <p className="text-[9px] font-black text-emerald-600 uppercase tracking-[0.15em]">{user.isGuest ? 'Cashback Wallet' : 'Savings Wallet'}</p>
                       <p className="text-base font-black text-slate-900 leading-none mt-0.5">{formatCurrency(user.wallet_balance || 0)}</p>
                     </div>
                   </div>
@@ -202,25 +360,77 @@ export default function UsersPage({ onViewChange }: UsersPageProps) {
                   </div>
                 </div>
 
-                <div className="mt-8 pt-4 border-t border-slate-50 flex items-center justify-between">
+                {/* Purchased Items Detail Frame */}
+                <div className="mt-4 border-t border-slate-100 pt-4">
+                  <p className="text-[9px] font-black text-slate-450 uppercase tracking-[0.12em] mb-2.5 flex items-center gap-1.5 font-mono">
+                    <Package className="w-3.5 h-3.5 text-slate-450 shrink-0" /> Recent Bought Items
+                  </p>
+                  {orders.filter(o => o.whatsapp_number === user.whatsapp_number).length > 0 ? (
+                    <div className="space-y-2">
+                      {orders
+                        .filter(o => o.whatsapp_number === user.whatsapp_number)
+                        .slice(0, 2)
+                        .map((order) => (
+                          <div 
+                            key={order.id} 
+                            className="bg-slate-50 border border-slate-100 hover:border-slate-200 p-3 rounded-xl flex items-center justify-between gap-4 transition-all duration-200"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <p className="font-bold text-slate-800 text-xs truncate">
+                                {order.product_details || order.product_name || 'Direct product checkout'}
+                              </p>
+                              <div className="flex items-center gap-2 mt-1 text-[9px] text-slate-450 font-bold uppercase tracking-wider">
+                                <span>{format(new Date(order.created_at), 'MMM dd, yyyy')}</span>
+                                <span className="w-1 h-1 rounded-full bg-slate-350" />
+                                <span>Quantity: {order.quantity || 1}</span>
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0 flex items-center gap-2">
+                              <span className="font-extrabold text-slate-900 text-xs">{formatCurrency(order.price)}</span>
+                              <span className={cn(
+                                "px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest leading-none border shrink-0",
+                                order.status === 'delivered' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                                order.status === 'completed' ? 'bg-slate-900 text-white border-transparent' :
+                                order.status === 'cancelled' ? 'bg-rose-50 text-rose-700 border-rose-100' :
+                                'bg-indigo-50 text-indigo-700 border-indigo-100'
+                              )}>
+                                {order.status}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      {orders.filter(o => o.whatsapp_number === user.whatsapp_number).length > 2 && (
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider text-center pt-1 animate-pulse">
+                          + {orders.filter(o => o.whatsapp_number === user.whatsapp_number).length - 2} more transaction entries in profile history
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-slate-400 font-semibold italic pl-1">No historical purchases logged for this contact.</p>
+                  )}
+                </div>
+
+                <div className="mt-6 pt-4 border-t border-slate-50 flex items-center justify-between">
                   <div className="flex flex-wrap gap-2">
                     <button
                       onClick={() => viewUserOrders(user)}
-                      className="flex items-center gap-2 text-[10px] font-black text-brand uppercase tracking-widest hover:bg-brand/5 px-3 py-2 rounded-xl transition-all border border-transparent hover:border-brand/10"
+                      className="flex items-center gap-2 text-[10px] font-black text-brand uppercase tracking-widest hover:bg-brand/5 px-3 py-2 rounded-xl transition-all border border-transparent hover:border-brand/10 cursor-pointer"
                     >
                       <ExternalLink className="w-3.5 h-3.5" />
                       History
                     </button>
-                    <button
-                      onClick={() => {
-                        setSelectedUserForBalance(user);
-                        setNewBalanceValue(String(user.wallet_balance || 0));
-                      }}
-                      className="flex items-center gap-2 text-[10px] font-black text-emerald-600 uppercase tracking-widest hover:bg-emerald-50 px-3 py-2 rounded-xl transition-all border border-transparent hover:border-emerald-100"
-                    >
-                      <Coins className="w-3.5 h-3.5" />
-                      Adjust Balance
-                    </button>
+                    {!user.isGuest && (
+                      <button
+                        onClick={() => {
+                          setSelectedUserForBalance(user);
+                          setNewBalanceValue(String(user.wallet_balance || 0));
+                        }}
+                        className="flex items-center gap-2 text-[10px] font-black text-emerald-600 uppercase tracking-widest hover:bg-emerald-50 px-3 py-2 rounded-xl transition-all border border-transparent hover:border-emerald-100 cursor-pointer"
+                      >
+                        <Coins className="w-3.5 h-3.5" />
+                        Adjust Balance
+                      </button>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <Calendar className="w-3.5 h-3.5 text-slate-400" />

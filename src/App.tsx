@@ -7,14 +7,111 @@ import BannersPage from './components/BannersPage';
 import ReviewsPage from './components/ReviewsPage';
 import UsersPage from './components/UsersPage';
 import LoginPage from './components/LoginPage';
+import LinkConverterModal from './components/LinkConverterModal';
 import { View } from './types';
 import { motion, AnimatePresence } from 'motion/react';
+import { db } from './lib/firebase';
+import { collection, onSnapshot, query, where, getDocs, updateDoc, doc } from 'firebase/firestore';
 
 export default function App() {
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [filterCategory, setFilterCategory] = useState('All');
+  const [isGlobalConverterOpen, setIsGlobalConverterOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    
+    // Background listener to automatically adjust product stock in real-time when orders are placed or cancelled
+    const unsubscribe = onSnapshot(collection(db, 'orders'), async (snapshot) => {
+      for (const change of snapshot.docChanges()) {
+        const orderId = change.doc.id;
+        const orderData = change.doc.data();
+        const status = orderData.status;
+        const productName = orderData.product_name;
+        const quantity = Number(orderData.quantity) || 1;
+        const isAdjusted = orderData.stock_adjusted === true;
+
+        if (!productName) continue;
+
+        // Is it created very recently (e.g. within last 1 hour) or is it a modification of status?
+        const orderTime = orderData.created_at?.toDate?.() || new Date(orderData.created_at || Date.now());
+        const isRecent = (Date.now() - orderTime.getTime()) < 60 * 60 * 1000; // 1 hour threshold
+
+        // Case 1: Subtract stock on a fresh order placement (must be a recent order, or actively added/modified)
+        if (status !== 'cancelled' && !isAdjusted && (change.type === 'added' ? isRecent : change.type === 'modified')) {
+          try {
+            const pQuery = query(collection(db, 'products'), where('name', '==', productName));
+            const pSnap = await getDocs(pQuery);
+            if (!pSnap.empty) {
+              const pDoc = pSnap.docs[0];
+              const pData = pDoc.data();
+              const currentStock = Number(pData.stock) || 0;
+              const currentQty = Number(pData.quantity) || Number(pData.qty) || 0;
+              const currentSold = Number(pData.sold) || 0;
+
+              await updateDoc(pDoc.ref, {
+                stock: Math.max(0, currentStock - quantity),
+                quantity: Math.max(0, currentQty - quantity),
+                qty: Math.max(0, currentQty - quantity),
+                sold: currentSold + quantity
+              });
+              
+              await updateDoc(doc(db, 'orders', orderId), {
+                stock_adjusted: true
+              });
+              console.log(`Auto-adjusted stock for product [${productName}] on order placement: -${quantity}`);
+            } else {
+              // mark handled anyway so we don't keep retrying
+              await updateDoc(doc(db, 'orders', orderId), {
+                stock_adjusted: true
+              });
+            }
+          } catch (e) {
+            console.error("Error auto-adjusting stock on order placement:", e);
+          }
+        }
+        
+        // Case 2: Restore stock if the order gets cancelled (can be any historical edit)
+        else if (status === 'cancelled' && isAdjusted && change.type === 'modified') {
+          try {
+            const pQuery = query(collection(db, 'products'), where('name', '==', productName));
+            const pSnap = await getDocs(pQuery);
+            if (!pSnap.empty) {
+              const pDoc = pSnap.docs[0];
+              const pData = pDoc.data();
+              const currentStock = Number(pData.stock) || 0;
+              const currentQty = Number(pData.quantity) || Number(pData.qty) || 0;
+              const currentSold = Number(pData.sold) || 0;
+
+              await updateDoc(pDoc.ref, {
+                stock: currentStock + quantity,
+                quantity: currentQty + quantity,
+                qty: currentQty + quantity,
+                sold: Math.max(0, currentSold - quantity)
+              });
+              
+              await updateDoc(doc(db, 'orders', orderId), {
+                stock_adjusted: false
+              });
+              console.log(`Restored stock for product [${productName}] on order cancellation: +${quantity}`);
+            } else {
+              await updateDoc(doc(db, 'orders', orderId), {
+                stock_adjusted: false
+              });
+            }
+          } catch (e) {
+            console.error("Error restoring stock on order cancellation:", e);
+          }
+        }
+      }
+    }, (error) => {
+      console.error("Background orders listener error:", error);
+    });
+
+    return () => unsubscribe();
+  }, [isAuthenticated]);
 
   useEffect(() => {
     const authStatus = localStorage.getItem('isAdminAuthenticated');
@@ -27,6 +124,12 @@ export default function App() {
     const handleOpenSidebar = () => setIsSidebarOpen(true);
     window.addEventListener('open-sidebar', handleOpenSidebar);
     return () => window.removeEventListener('open-sidebar', handleOpenSidebar);
+  }, []);
+
+  useEffect(() => {
+    const handleOpenConverter = () => setIsGlobalConverterOpen(true);
+    window.addEventListener('open-link-converter', handleOpenConverter);
+    return () => window.removeEventListener('open-link-converter', handleOpenConverter);
   }, []);
 
   const handleLogin = () => {
@@ -94,6 +197,11 @@ export default function App() {
           </motion.div>
         </AnimatePresence>
       </div>
+
+      <LinkConverterModal 
+        isOpen={isGlobalConverterOpen} 
+        onClose={() => setIsGlobalConverterOpen(false)} 
+      />
     </div>
   );
 }

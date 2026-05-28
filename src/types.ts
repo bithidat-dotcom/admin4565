@@ -10,7 +10,18 @@ export interface Product {
   category?: string;
   created_at: string;
   stock?: number;
+  quantity?: number;
+  qty?: number;
   sold?: number;
+  gadgetSpecs?: {
+    ram?: string;
+    storage?: string;
+    refreshRate?: string;
+    battery?: string;
+    watt?: string;
+    amp?: string;
+  };
+  discountExpiresAt?: string;
 }
 
 export interface Order {
