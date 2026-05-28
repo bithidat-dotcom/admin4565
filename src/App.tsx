@@ -14,6 +14,7 @@ export default function App() {
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [filterCategory, setFilterCategory] = useState('All');
 
   useEffect(() => {
     const authStatus = localStorage.getItem('isAdminAuthenticated');
@@ -40,9 +41,23 @@ export default function App() {
   const renderView = () => {
     switch (currentView) {
       case 'dashboard':
-        return <Dashboard onViewChange={setCurrentView} />;
+        return (
+          <Dashboard 
+            onViewChange={setCurrentView} 
+            defaultCategory={filterCategory}
+            onCategoryFilterChange={(cat) => {
+              setFilterCategory(cat);
+              setCurrentView('products');
+            }}
+          />
+        );
       case 'products':
-        return <ProductsPage />;
+        return (
+          <ProductsPage 
+            defaultCategory={filterCategory}
+            onCategoryFilterChange={setFilterCategory}
+          />
+        );
       case 'orders':
         return <OrdersPage />;
       case 'banners':

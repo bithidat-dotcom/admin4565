@@ -2,9 +2,29 @@ import React, { useState, useEffect } from 'react';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
 import Header from '../components/Header';
-import { ShoppingBag, ShoppingCart, TrendingUp, Users, Loader2, Star, Trash2, ArrowRight, BarChart3, PieChart as PieChartIcon } from 'lucide-react';
+import { 
+  ShoppingBag, 
+  ShoppingCart, 
+  TrendingUp, 
+  Users, 
+  Loader2, 
+  Star, 
+  Trash2, 
+  ArrowRight, 
+  BarChart3, 
+  PieChart as PieChartIcon,
+  Sparkles, 
+  Utensils, 
+  Shirt, 
+  Smartphone, 
+  Cpu, 
+  Monitor, 
+  Layers, 
+  Trophy, 
+  ShoppingBasket 
+} from 'lucide-react';
 import { formatCurrency, cn } from '../lib/utils';
-import { Order } from '../types';
+import { Order, Product } from '../types';
 import { 
   BarChart, 
   Bar, 
@@ -22,9 +42,11 @@ import { format, subDays, isSameDay, startOfDay } from 'date-fns';
 
 interface DashboardProps {
   onViewChange?: (view: any) => void;
+  defaultCategory?: string;
+  onCategoryFilterChange?: (category: string) => void;
 }
 
-export default function Dashboard({ onViewChange }: DashboardProps) {
+export default function Dashboard({ onViewChange, defaultCategory = 'All', onCategoryFilterChange }: DashboardProps) {
   const [stats, setStats] = useState({
     totalProducts: 0,
     totalOrders: 0,
@@ -36,6 +58,7 @@ export default function Dashboard({ onViewChange }: DashboardProps) {
   });
   const [orders, setOrders] = useState<Order[]>([]);
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
+  const [productsList, setProductsList] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
 
@@ -72,8 +95,13 @@ export default function Dashboard({ onViewChange }: DashboardProps) {
       setLoading(false);
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'orders'));
 
-    // Listen to products count
+    // Listen to products list and count
     const unsubscribeProducts = onSnapshot(collection(db, 'products'), (snapshot) => {
+      const pList = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Product[];
+      setProductsList(pList);
       setStats(prev => ({
         ...prev,
         totalProducts: snapshot.size
@@ -113,10 +141,14 @@ export default function Dashboard({ onViewChange }: DashboardProps) {
     };
   }, []);
 
+  const totalStock = productsList.reduce((sum, p) => sum + (p.stock ?? 0), 0);
+  const totalSold = productsList.reduce((sum, p) => sum + (p.sold ?? 0), 0);
+  const totalInventoryValue = productsList.reduce((sum, p) => sum + ((p.stock ?? 0) * p.price), 0);
+
   const statCards = [
     { label: 'DELIVERY REVENUE', value: formatCurrency(stats.totalRevenue), icon: TrendingUp, color: 'text-emerald-500', bg: 'bg-emerald-50', change: 'Live from Firestore', changeColor: 'text-emerald-500' },
     { label: 'LIVE ORDERS', value: stats.totalOrders.toString(), icon: ShoppingCart, color: 'text-brand', bg: 'bg-indigo-50', change: `${stats.pendingOrders} pending confirmation`, changeColor: 'text-brand' },
-    { label: 'STORE PRODUCTS', value: stats.totalProducts.toString(), icon: ShoppingBag, color: 'text-brand-dark', bg: 'bg-slate-100', change: 'Database Inventory', changeColor: 'text-blue-500' },
+    { label: 'STORE PRODUCTS', value: stats.totalProducts.toString(), icon: ShoppingBag, color: 'text-brand-dark', bg: 'bg-slate-100', change: `${totalStock} in stock • ${totalSold} sold • Value: ${formatCurrency(totalInventoryValue)}`, changeColor: 'text-blue-500' },
     { label: 'MEMBERS BASE', value: stats.totalUsers.toString(), icon: Users, color: 'text-indigo-500', bg: 'bg-indigo-50', change: 'Registered users', changeColor: 'text-indigo-500' },
   ];
 
@@ -273,6 +305,116 @@ export default function Dashboard({ onViewChange }: DashboardProps) {
                         />
                       </PieChart>
                     </ResponsiveContainer>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Best Sellers and Inventory Control */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Top Selling Products Card */}
+              <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col shadow-sm">
+                <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                  <div>
+                    <h3 className="font-black text-slate-900 text-base uppercase tracking-tight flex items-center gap-2">
+                      <TrendingUp className="w-4 h-4 text-emerald-500" />
+                      Top Selling Registry
+                    </h3>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Highly requested products by customers</p>
+                  </div>
+                </div>
+                <div className="p-6 flex-1 divide-y divide-slate-100 overflow-y-auto max-h-[350px]">
+                  {productsList.length > 0 ? (
+                    [...productsList]
+                      .sort((a, b) => (b.sold ?? 0) - (a.sold ?? 0))
+                      .slice(0, 5)
+                      .map((p) => {
+                        const totalProductRevenue = (p.sold ?? 0) * p.price;
+                        return (
+                          <div key={p.id} className="flex items-center gap-4 py-3.5 first:pt-0 last:pb-0">
+                            <div className="w-12 h-12 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center overflow-hidden shrink-0">
+                              {p.image ? (
+                                <img src={p.image} referrerPolicy="no-referrer" alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                <span className="font-black text-slate-400 text-lg">P</span>
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-[9px] font-black text-indigo-500 uppercase tracking-wider">{p.category || 'General'}</span>
+                                <span className="text-xs font-black text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-full">{p.sold ?? 0} Sold</span>
+                              </div>
+                              <h4 className="text-sm font-bold text-slate-800 truncate mt-0.5 uppercase">{p.name}</h4>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <div className="text-xs font-black text-slate-900">{formatCurrency(p.price)}</div>
+                              <div className="text-[9px] text-slate-400 font-bold uppercase">Rev: {formatCurrency(totalProductRevenue)}</div>
+                            </div>
+                          </div>
+                        );
+                      })
+                  ) : (
+                    <div className="py-12 text-center text-slate-400">
+                      No product sales tracked yet.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Stock Alerts & Inventory Value Card */}
+              <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col shadow-sm">
+                <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                  <div>
+                    <h3 className="font-black text-slate-900 text-base uppercase tracking-tight flex items-center gap-2">
+                      <ShoppingBag className="w-4 h-4 text-amber-500" />
+                      Critical Stock Board
+                    </h3>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Inventory shortages and depletion warnings</p>
+                  </div>
+                </div>
+                <div className="p-6 flex-1 divide-y divide-slate-100 overflow-y-auto max-h-[350px]">
+                  {productsList.length > 0 ? (
+                    (() => {
+                      const lowStockProducts = productsList.filter(p => (p.stock ?? 0) <= 5);
+                      if (lowStockProducts.length === 0) {
+                        return (
+                          <div className="py-12 text-center text-emerald-600 font-bold text-xs uppercase tracking-wider flex flex-col items-center justify-center h-full">
+                            🎉 All products are fully stocked!
+                            <span className="text-[9px] text-slate-400 font-bold block mt-1">No warnings to report currently</span>
+                          </div>
+                        );
+                      }
+                      return lowStockProducts.slice(0, 5).map((p) => (
+                        <div key={p.id} className="flex items-center gap-4 py-3.5 first:pt-0 last:pb-0">
+                          <div className="w-12 h-12 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center overflow-hidden shrink-0">
+                            {p.image ? (
+                              <img src={p.image} referrerPolicy="no-referrer" alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <span className="font-black text-slate-400 text-lg">P</span>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className={cn(
+                                "text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full",
+                                (p.stock ?? 0) === 0 ? "bg-red-50 text-red-600 border border-red-100" : "bg-amber-50 text-amber-600 border border-amber-100"
+                              )}>
+                                {(p.stock ?? 0) === 0 ? "OUT OF STOCK" : "LOW STOCK"}
+                              </span>
+                              <span className="text-xs font-black text-slate-800">{p.stock ?? 0} left</span>
+                            </div>
+                            <h4 className="text-sm font-bold text-slate-800 truncate mt-0.5 uppercase">{p.name}</h4>
+                          </div>
+                          <div className="text-right shrink-0 font-bold text-xs text-slate-900">
+                            {formatCurrency(p.price)}
+                          </div>
+                        </div>
+                      ));
+                    })()
+                  ) : (
+                    <div className="py-12 text-center text-slate-400">
+                      No products registered.
+                    </div>
                   )}
                 </div>
               </div>

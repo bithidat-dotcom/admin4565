@@ -4,11 +4,44 @@ import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, d
 import { Product } from '../types';
 import Header from '../components/Header';
 import Modal from '../components/Modal';
-import { Edit2, Trash2, Loader2, Image as ImageIcon, Plus } from 'lucide-react';
+import { 
+  Edit2, 
+  Trash2, 
+  Loader2, 
+  Image as ImageIcon, 
+  Plus,
+  Sparkles, 
+  Pizza, 
+  Crown, 
+  Smartphone, 
+  Bot, 
+  Laptop, 
+  Layers, 
+  Dumbbell, 
+  ShoppingBasket,
+  Boxes
+} from 'lucide-react';
 import ImageUploader from './ImageUploader';
 import { formatCurrency, cn } from '../lib/utils';
 
-export default function ProductsPage() {
+interface ProductsPageProps {
+  defaultCategory?: string;
+  onCategoryFilterChange?: (category: string) => void;
+}
+
+const categoryFilters = [
+  { name: 'All', icon: Boxes },
+  { name: 'Food', icon: Pizza },
+  { name: 'Fashion', icon: Crown },
+  { name: 'Gadget', icon: Smartphone },
+  { name: 'Robotic', icon: Bot },
+  { name: 'PC', icon: Laptop },
+  { name: 'Cloth', icon: Layers },
+  { name: 'Sports', icon: Dumbbell },
+  { name: 'Grocery', icon: ShoppingBasket },
+];
+
+export default function ProductsPage({ defaultCategory = 'All', onCategoryFilterChange }: ProductsPageProps = {}) {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -25,14 +58,24 @@ export default function ProductsPage() {
     images: [] as string[],
     discount: '0',
     seller: '',
-    category: 'Food'
+    category: 'Food',
+    stock: '20',
+    sold: '0'
   });
 
   const [newImageUrl, setNewImageUrl] = useState('');
   const [filterName, setFilterName] = useState('');
-  const [filterCategory, setFilterCategory] = useState('All');
+  const [filterCategory, setFilterCategory] = useState(defaultCategory);
 
   const categories = ['Food', 'Fashion', 'Gadget', 'Robotic', 'PC', 'Cloth', 'Sports', 'Grocery'];
+
+  useEffect(() => {
+    setFilterCategory(defaultCategory);
+  }, [defaultCategory]);
+
+  useEffect(() => {
+    onCategoryFilterChange?.(filterCategory);
+  }, [filterCategory, onCategoryFilterChange]);
 
   const filteredProducts = products.filter(product => 
     product.name.toLowerCase().includes(filterName.toLowerCase()) &&
@@ -68,7 +111,9 @@ export default function ProductsPage() {
       images: [],
       discount: '0',
       seller: '',
-      category: 'Food'
+      category: 'Food',
+      stock: '20',
+      sold: '0'
     });
     setEditingProduct(null);
     setNewImageUrl('');
@@ -76,6 +121,9 @@ export default function ProductsPage() {
 
   const handleOpenAddModal = () => {
     resetForm();
+    if (filterCategory !== 'All') {
+      setFormData(prev => ({ ...prev, category: filterCategory }));
+    }
     setIsModalOpen(true);
   };
 
@@ -89,7 +137,9 @@ export default function ProductsPage() {
       images: product.images || [],
       discount: product.discount.toString(),
       seller: product.seller || '',
-      category: product.category || 'Food'
+      category: product.category || 'Food',
+      stock: (product.stock ?? 20).toString(),
+      sold: (product.sold ?? 0).toString()
     });
     setIsModalOpen(true);
   };
@@ -173,6 +223,8 @@ export default function ProductsPage() {
       description: formData.description,
       seller: formData.seller,
       category: formData.category,
+      stock: parseInt(formData.stock) || 0,
+      sold: parseInt(formData.sold) || 0,
       updatedAt: serverTimestamp()
     };
 
@@ -202,6 +254,44 @@ export default function ProductsPage() {
         onAction={handleOpenAddModal} 
         actionLabel="New Product" 
       />
+
+      {/* Category Quick Filter Bar */}
+      <div className="px-4 md:px-8 mt-4">
+        <div className="bg-white/75 p-4 rounded-2xl border border-slate-200/60 shadow-sm">
+          <div className="flex items-center justify-between mb-3 px-1">
+            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-brand" />
+              Category Registry Shortcuts
+            </h4>
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider lg:inline hidden">
+              Scroll Horizontally &rarr;
+            </span>
+          </div>
+          <div className="flex gap-2.5 overflow-x-auto pb-1.5 scrollbar-none snap-x touch-pan-x -mx-2 px-2">
+            {categoryFilters.map((cat) => {
+              const IconComponent = cat.icon;
+              const isActive = filterCategory === cat.name;
+              return (
+                <button
+                  key={cat.name}
+                  type="button"
+                  onClick={() => setFilterCategory(cat.name)}
+                  className={cn(
+                    "snap-start flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300 shrink-0 border cursor-pointer",
+                    isActive
+                      ? "bg-slate-900 border-slate-900 text-white shadow-lg shadow-slate-200"
+                      : "bg-white border-slate-200/80 text-slate-500 hover:text-slate-900 hover:border-slate-300 hover:bg-slate-50"
+                  )}
+                >
+                  <IconComponent className={cn("w-3.5 h-3.5", isActive ? "text-brand animate-pulse" : "text-slate-400")} />
+                  {cat.name}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
       <div className="px-4 md:px-8 mt-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
         <button
           onClick={handleOpenDeleteAllModal}
@@ -297,6 +387,28 @@ export default function ProductsPage() {
                   <p className="text-slate-500 text-xs mt-2 line-clamp-2 min-h-[32px] leading-relaxed">
                     {product.description}
                   </p>
+                  
+                  {/* Stock Status & Units Sold indicators */}
+                  <div className="mt-3 flex items-center justify-between gap-2">
+                    <span className={cn(
+                      "text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full",
+                      (product.stock ?? 0) === 0 
+                        ? "bg-red-50 text-red-600 border border-red-100" 
+                        : (product.stock ?? 0) <= 5 
+                          ? "bg-amber-50 text-amber-600 border border-amber-100" 
+                          : "bg-emerald-50 text-emerald-600 border border-emerald-100"
+                    )}>
+                      {(product.stock ?? 0) === 0 
+                        ? "Out Of Stock" 
+                        : (product.stock ?? 0) <= 5 
+                          ? `Low Stock: ${product.stock}` 
+                          : `In Stock: ${product.stock}`}
+                    </span>
+                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest bg-slate-100 border border-slate-200 px-2.5 py-0.5 rounded-full">
+                      {product.sold ?? 0} Sold
+                    </span>
+                  </div>
+
                   {product.seller && (
                     <div className="mt-2 text-[10px] font-bold text-indigo-500 uppercase tracking-tight">
                       Seller: {product.seller}
@@ -428,6 +540,33 @@ export default function ProductsPage() {
                   <option key={cat} value={cat}>{cat}</option>
                 ))}
               </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">Stock Available</label>
+              <input
+                required
+                type="number"
+                min="0"
+                value={formData.stock}
+                onChange={e => setFormData({ ...formData, stock: e.target.value })}
+                className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all text-sm font-medium"
+                placeholder="Number of products in stock..."
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">Units Sold (Initial/Accumulated)</label>
+              <input
+                required
+                type="number"
+                min="0"
+                value={formData.sold}
+                onChange={e => setFormData({ ...formData, sold: e.target.value })}
+                className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all text-sm font-medium"
+                placeholder="Number of items sold..."
+              />
             </div>
           </div>
 

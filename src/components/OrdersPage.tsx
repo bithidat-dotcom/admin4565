@@ -16,6 +16,7 @@ export default function OrdersPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFilter, setDateFilter] = useState('');
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
+  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -101,6 +102,28 @@ export default function OrdersPage() {
         setTimeout(() => {
           syncUserStats(updatedOrder.whatsapp_number);
         }, 500);
+      }
+
+      // Automatically adjust product inventory stock & sold figures in Firestore upon order completion
+      if (newStatus === 'completed' && updatedOrder && updatedOrder.product_name) {
+        try {
+          const product_name = updatedOrder.product_name;
+          const quantity = Number(updatedOrder.quantity) || 1;
+          const pQuery = query(collection(db, 'products'), where('name', '==', product_name));
+          const pSnapshot = await getDocs(pQuery);
+          if (!pSnapshot.empty) {
+            const pDoc = pSnapshot.docs[0];
+            const currentStock = pDoc.data().stock ?? 20;
+            const currentSold = pDoc.data().sold ?? 0;
+            await updateDoc(pDoc.ref, {
+              stock: Math.max(0, currentStock - quantity),
+              sold: currentSold + quantity
+            });
+            console.log(`Auto adjusted product [${product_name}] stock: -${quantity}, sold: +${quantity}`);
+          }
+        } catch (itemErr) {
+          console.error("Failed to automatically update product inventory states:", itemErr);
+        }
       }
     } catch (err: any) {
       handleFirestoreError(err, OperationType.UPDATE, `orders/${id}`);

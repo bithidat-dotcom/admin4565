@@ -9,6 +9,8 @@ export interface Product {
   seller?: string;
   category?: string;
   created_at: string;
+  stock?: number;
+  sold?: number;
 }
 
 export interface Order {
