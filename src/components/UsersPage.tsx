@@ -57,7 +57,9 @@ export default function UsersPage({ onViewChange }: UsersPageProps) {
     
     // Listen to registered users
     const unsubUsers = onSnapshot(collection(db, 'users'), (usersSnap) => {
-      const usersList = usersSnap.docs.map(doc => {
+      const usersList = usersSnap.docs
+        .filter(doc => doc.data().is_hidden !== true)
+        .map(doc => {
         const rawData = doc.data();
         let resolvedDate = new Date().toISOString();
         if (rawData.created_at) {
@@ -197,9 +199,13 @@ export default function UsersPage({ onViewChange }: UsersPageProps) {
     setUserToDelete(null);
     setDeletingId(id);
     try {
-      await deleteDoc(doc(db, 'users', id));
+      // Hide the profile instead of actual deletion as requested
+      await updateDoc(doc(db, 'users', id), {
+        is_hidden: true,
+        hidden_at: new Date().toISOString()
+      });
     } catch (err) {
-      handleFirestoreError(err, OperationType.DELETE, `users/${id}`);
+      handleFirestoreError(err, OperationType.UPDATE, `users/${id}`);
     } finally {
       setDeletingId(null);
     }
@@ -451,8 +457,8 @@ export default function UsersPage({ onViewChange }: UsersPageProps) {
             {users.length === 0 && (
               <div className="col-span-full p-16 text-center text-slate-500 bg-slate-50/50 rounded-2xl border-2 border-dashed border-slate-200">
                 <Users className="w-16 h-16 mx-auto mb-4 opacity-20" />
-                <p className="text-lg font-black text-slate-900 uppercase tracking-tight">No registered customers</p>
-                <p className="text-sm font-medium mt-1">Customer profiles will appear here as they register on the platform.</p>
+                <p className="text-lg font-black text-slate-900 uppercase tracking-tight">No Customers Found</p>
+                <p className="text-sm font-medium mt-1">Detailed customer profiles will appear here as they interact with the platform.</p>
               </div>
             )}
           </div>
@@ -509,18 +515,18 @@ export default function UsersPage({ onViewChange }: UsersPageProps) {
       <Modal
         isOpen={userToDelete !== null}
         onClose={() => setUserToDelete(null)}
-        title="Delete Customer Profile?"
+        title="Hide Customer Profile?"
       >
         <div className="space-y-6">
           <p className="text-sm font-bold text-slate-600 uppercase tracking-wide leading-relaxed">
-            Are you sure you want to delete this customer's profile? All their transaction history metadata in this view will be detached. This action cannot be undone.
+            Are you sure you want to hide this customer's profile? The user will no longer appear in the directory list, but their historical order data will remain in the database.
           </p>
           <div className="flex gap-4">
             <button
               onClick={confirmDeleteUser}
               className="flex-1 py-4 bg-slate-900 hover:bg-black active:scale-98 transition-all text-white text-xs font-black uppercase tracking-widest rounded-xl shadow-lg shadow-slate-200 cursor-pointer"
             >
-              Purge Profile
+              Hide Profile
             </button>
             <button
               onClick={() => setUserToDelete(null)}
