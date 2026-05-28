@@ -345,8 +345,9 @@ export default function LinkConverterModal({ isOpen, onClose, onApplyLink }: Lin
                             {onApplyLink && (
                               <button
                                 type="button"
+                                disabled={selectedFile && selectedFile.size > 102400}
                                 onClick={() => handleApply(base64Url)}
-                                className="text-[10px] font-bold uppercase tracking-wider bg-brand text-white px-3 py-1.5 rounded-lg hover:bg-brand-dark transition-all flex items-center gap-1"
+                                className="text-[10px] font-bold uppercase tracking-wider bg-brand text-white px-3 py-1.5 rounded-lg hover:bg-brand-dark transition-all flex items-center gap-1 disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed"
                               >
                                 Apply Direct
                                 <ArrowRight className="w-3 h-3" />
@@ -366,6 +367,14 @@ export default function LinkConverterModal({ isOpen, onClose, onApplyLink }: Lin
                       <p className="text-xs text-slate-400">
                         Convert your image into a direct, inline Base64 data string. It works offline instantly and does not rely on foreign cloud storage.
                       </p>
+                      {selectedFile && selectedFile.size > 102400 && (
+                        <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-2">
+                          <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                          <p className="text-[10px] font-medium text-amber-700">
+                            <strong>Warning:</strong> This image is {(selectedFile.size / 1024).toFixed(1)}KB. Base64 strings this large can cause "Document too large" errors in our database. We recommend <strong>Method 2 (Cloud)</strong> for this file.
+                          </p>
+                        </div>
+                      )}
                       {isConverting ? (
                         <div className="flex items-center gap-2 text-xs font-bold text-slate-500 py-2">
                           <Loader2 className="w-4 h-4 text-brand animate-spin" />

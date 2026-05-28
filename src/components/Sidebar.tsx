@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, ShoppingBag, ShoppingCart, Image as ImageIcon, ChevronRight, Star, Users, X, Link as LinkIcon } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, ShoppingCart, Image as ImageIcon, ChevronRight, Star, Users, X, Link as LinkIcon, Store } from 'lucide-react';
 import { View } from '../types';
 import { cn } from '../lib/utils';
 
@@ -18,6 +18,7 @@ export default function Sidebar({ currentView, onViewChange, isOpen = false, onC
     { id: 'banners' as View, icon: ImageIcon, label: 'Banners' },
     { id: 'reviews' as View, icon: Star, label: 'Reviews' },
     { id: 'users' as View, icon: Users, label: 'Customers' },
+    { id: 'sellers' as View, icon: Store, label: 'Sellers' },
   ];
 
   return (

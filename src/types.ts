@@ -7,6 +7,12 @@ export interface Product {
   images: string[];
   discount: number;
   seller?: string;
+  seller_logo?: string;
+  seller_whatsapp?: string;
+  seller_email?: string;
+  seller_facebook?: string;
+  seller_instagram?: string;
+  seller_tiktok?: string;
   category?: string;
   created_at: string;
   stock?: number;
@@ -68,4 +74,16 @@ export interface User {
   created_at: string;
 }
 
-export type View = 'dashboard' | 'products' | 'orders' | 'banners' | 'reviews' | 'users';
+export interface Seller {
+  id: string;
+  name: string;
+  logo: string;
+  whatsapp_number: string;
+  email?: string;
+  facebook?: string;
+  instagram?: string;
+  tiktok?: string;
+  created_at: string;
+}
+
+export type View = 'dashboard' | 'products' | 'orders' | 'banners' | 'reviews' | 'users' | 'sellers';

@@ -6,6 +6,7 @@ import OrdersPage from './components/OrdersPage';
 import BannersPage from './components/BannersPage';
 import ReviewsPage from './components/ReviewsPage';
 import UsersPage from './components/UsersPage';
+import SellersPage from './components/SellersPage';
 import LoginPage from './components/LoginPage';
 import LinkConverterModal from './components/LinkConverterModal';
 import { View } from './types';
@@ -169,6 +170,8 @@ export default function App() {
         return <ReviewsPage />;
       case 'users':
         return <UsersPage onViewChange={setCurrentView} />;
+      case 'sellers':
+        return <SellersPage />;
       default:
         return <Dashboard onViewChange={setCurrentView} />;
     }

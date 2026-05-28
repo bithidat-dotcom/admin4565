@@ -8,7 +8,7 @@ import LinkConverterModal from './LinkConverterModal';
 interface ImageUploaderProps {
   value: string;
   onChange: (url: string) => void;
-  folder: 'products' | 'banners';
+  folder: 'products' | 'banners' | 'sellers';
   className?: string;
 }
 
