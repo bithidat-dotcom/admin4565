@@ -1,43 +1,9 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // All collections are public for this standalone dashboard as requested
-    
-    match /products/{id} {
-      allow read, write: if true;
-    }
-    
-    match /banners/{id} {
-      allow read, write: if true;
-    }
-    
-    match /orders/{id} {
-      allow read, write: if true;
-    }
-
-    match /reviews/{id} {
-      allow read, write: if true;
-    }
-
-    match /users/{id} {
-      allow read, write: if true;
-    }
-
-    match /sellers/{id} {
-      allow read, write: if true;
-    }
-
-    match /chats/{chatId} {
-      allow read, write: if true;
-    }
-
-    match /chats/{chatId}/messages/{messageId} {
-      allow read, write: if true;
-    }
-
-    // Default deny
+    // Standalone simplified ecommerce rules for real-time synchronization between storefront and admin
     match /{document=**} {
-      allow read, write: if false;
+      allow read, write: if true;
     }
   }
 }

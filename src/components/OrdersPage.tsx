@@ -4,7 +4,8 @@ import { collection, onSnapshot, query, orderBy, updateDoc, deleteDoc, doc, wher
 import { Order } from '../types';
 import Header from '../components/Header';
 import Modal from './Modal';
-import { Loader2, Phone, MapPin, Package, Clock, CheckCircle, Search, Trash2, ShieldCheck, Lock, Copy, Check, MessageSquare } from 'lucide-react';
+import OrderTableView from './OrderTableView';
+import { Loader2, Phone, MapPin, Package, Clock, CheckCircle, Search, Trash2, ShieldCheck, Lock, Copy, Check, MessageSquare, Store } from 'lucide-react';
 import { formatCurrency, cn } from '../lib/utils';
 import { format, isSameDay } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
@@ -19,8 +20,10 @@ export default function OrdersPage() {
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
+  const [isTableView, setIsTableView] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [sellers, setSellers] = useState<Record<string, any>>({});
 
   const handleCopy = (id: string, text: string) => {
     navigator.clipboard.writeText(text);
@@ -55,7 +58,18 @@ export default function OrdersPage() {
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    const unsubscribeSellers = onSnapshot(collection(db, 'sellers'), (snapshot) => {
+      const sellersMap: Record<string, any> = {};
+      snapshot.docs.forEach(doc => {
+        sellersMap[doc.data().name] = { id: doc.id, ...doc.data() };
+      });
+      setSellers(sellersMap);
+    });
+
+    return () => {
+      unsubscribe();
+      unsubscribeSellers();
+    };
   }, []);
 
   const syncUserStats = async (whatsappNumber: string) => {
@@ -203,6 +217,10 @@ export default function OrdersPage() {
 
       <main className="p-4 md:p-8">
         <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex gap-2 bg-white p-1 rounded-xl border border-slate-200">
+             <button onClick={() => setIsTableView(true)} className={cn("px-4 py-2 rounded-lg text-xs font-black", isTableView ? "bg-slate-900 text-white" : "text-slate-500")}>Table View</button>
+             <button onClick={() => setIsTableView(false)} className={cn("px-4 py-2 rounded-lg text-xs font-black", !isTableView ? "bg-slate-900 text-white" : "text-slate-500")}>Card View</button>
+          </div>
           <div className="flex flex-wrap items-center gap-4">
             <div className="bg-white border border-slate-200 rounded-xl px-4 py-2 text-xs text-slate-500 flex items-center gap-2 font-bold uppercase tracking-widest hover:bg-slate-50 transition-colors cursor-pointer" onClick={selectAll}>
               <input 
@@ -255,242 +273,190 @@ export default function OrdersPage() {
           </div>
         ) : (
           <div className="space-y-4">
-            <AnimatePresence mode="popLayout">
-              {filteredOrders.map((order) => (
-                <motion.div
-                  layout
-                  initial={{ opacity: 0, scale: 0.98 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.98 }}
-                  key={order.id}
-                  className={cn(
-                    "bg-white rounded-xl border p-6 transition-all duration-300 relative",
-                    selectedOrders.has(order.id) ? "border-brand shadow-sm shadow-brand/10 ring-1 ring-brand/10" : "border-slate-200 hover:shadow-sm"
-                  )}
-                >
-                  <div className="absolute top-6 left-6 z-10 hidden sm:block">
-                    <input 
-                      type="checkbox" 
-                      className="w-5 h-5 rounded border-slate-300 text-brand focus:ring-brand cursor-pointer"
-                      checked={selectedOrders.has(order.id)}
-                      onChange={() => toggleSelection(order.id)}
-                    />
-                  </div>
+            {isTableView ? (
+              <OrderTableView orders={filteredOrders} onStatusChange={updateStatus} statusUpdatingId={statusUpdatingId} />
+            ) : (
+                <AnimatePresence mode="popLayout">
+                  {filteredOrders.map((order) => (
+                    <motion.div
+                      layout
+                      initial={{ opacity: 0, scale: 0.98 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.98 }}
+                      key={order.id}
+                      className={cn(
+                        "bg-white rounded-2xl border p-0 overflow-hidden transition-all duration-300 relative",
+                        selectedOrders.has(order.id) ? "border-brand shadow-lg shadow-brand/10 ring-2 ring-brand/10" : "border-slate-200 hover:shadow-md"
+                      )}
+                    >
+                      {/* Status Bar */}
+                      <div className={cn("h-1.5 w-full", getStatusColor(order.status).split(' ')[0])} />
 
-                  <div className="flex flex-col lg:flex-row items-start justify-between gap-8 sm:pl-10">
-                    <div className="flex-1 w-full lg:w-auto">
-                      <div className="flex items-start gap-4 mb-8">
-                        <div className="w-16 h-16 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center font-black text-slate-400 text-2xl hidden sm:flex shrink-0">
-                          {order.customer_name?.charAt(0) || '?'}
-                        </div>
-                        <div className="sm:hidden shrink-0 mt-1">
-                           <input 
+                      <div className="p-6">
+                        <div className="absolute top-6 right-6 z-10">
+                          <input 
                             type="checkbox" 
-                            className="w-6 h-6 rounded border-slate-300 text-brand focus:ring-brand cursor-pointer"
+                            className="w-5 h-5 rounded border-slate-300 text-brand focus:ring-brand cursor-pointer"
                             checked={selectedOrders.has(order.id)}
                             onChange={() => toggleSelection(order.id)}
                           />
                         </div>
-                        <div className="flex-1">
-                          <div className="flex flex-wrap items-center gap-3 mb-1">
-                            <h3 className="font-black text-slate-900 text-xl uppercase tracking-tight">{order.customer_name || 'Generic Customer'}</h3>
-                            <span className={cn(
-                              "px-3 py-1 rounded text-[10px] font-black uppercase tracking-[0.15em] shadow-sm",
-                              getStatusColor(order.status)
-                            )}>
-                              {order.status}
-                            </span>
-                          </div>
-                          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                            <div className="flex items-center gap-2 text-slate-600 flex-wrap">
-                              <Phone className="w-4 h-4 text-emerald-500 shrink-0" />
-                              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Contact Hub:</span>
-                              <span className="text-slate-900 font-bold tracking-normal">{order.whatsapp_number}</span>
-                              <div className="flex items-center gap-1.5 ml-2">
-                                <button
-                                  onClick={() => handleCopy(order.id, order.whatsapp_number)}
-                                  className="p-1 text-slate-400 hover:text-brand hover:bg-slate-100 rounded transition-all cursor-pointer"
-                                  title="Copy Number"
-                                >
-                                  {copiedId === order.id ? (
-                                    <Check className="w-3.5 h-3.5 text-emerald-500 animate-bounce" />
-                                  ) : (
-                                    <Copy className="w-3.5 h-3.5" />
-                                  )}
-                                </button>
-                                {order.whatsapp_number && (
-                                  <a
-                                    href={`https://wa.me/${order.whatsapp_number.replace(/[^0-9]/g, '').startsWith('01') ? '88' + order.whatsapp_number.replace(/[^0-9]/g, '') : order.whatsapp_number.replace(/[^0-9]/g, '')}`}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="p-1 text-emerald-500 hover:bg-emerald-50 rounded transition-all flex items-center justify-center cursor-pointer"
-                                    title="Open WhatsApp Chat"
-                                  >
-                                    <MessageSquare className="w-3.5 h-3.5" />
-                                  </a>
-                                )}
-                              </div>
-                            </div>
-                            <span className="flex items-center gap-2">
-                              <MapPin className="w-4 h-4 text-slate-400" />
-                              {order.location}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
 
-                      <div className="space-y-4">
-                        <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 group">
-                          <div className="flex items-center gap-3 mb-4">
-                            <div className="w-10 h-10 bg-white rounded-xl border border-slate-200 flex items-center justify-center text-brand shrink-0">
-                              <Package className="w-5 h-5" />
-                            </div>
-                            <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Package Payload & Quantity</p>
-                          </div>
-                          <div className="bg-white rounded-xl p-4 border border-slate-100 shadow-inner">
-                            {(order.product_name || order.quantity) && (
-                              <div className="mb-4 pb-4 border-b border-slate-50">
-                                {order.product_name && (
-                                  <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Product Name</span>
-                                    <span className="font-black text-slate-900 text-sm">{order.product_name}</span>
-                                  </div>
-                                )}
-                                {order.quantity && (
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Quantity</span>
-                                    <span className="font-black text-brand text-sm">{order.quantity} Units</span>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                            <div className="flex flex-col gap-2">
-                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Description / Special Instructions</p>
-                              <p className="font-bold text-slate-800 text-base whitespace-pre-wrap leading-relaxed">
-                                {order.product_details || 'No additional details specified'}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        <div className="bg-brand/5 rounded-2xl p-6 border border-brand/10 flex items-center justify-between group">
-                          <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-white rounded-xl border border-brand/20 flex items-center justify-center text-brand shrink-0 group-hover:scale-110 transition-transform">
-                              <span className="font-black text-xl">৳</span>
-                            </div>
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                          {/* Customer Info Section (Left) */}
+                          <div className="lg:col-span-4 space-y-6">
                             <div>
-                              <p className="text-[10px] font-black text-brand uppercase tracking-[0.2em]">Transaction Total</p>
-                              <p className="text-2xl font-black text-slate-900 leading-none mt-1">{formatCurrency(order.price)}</p>
+                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Customer Details</p>
+                              <h3 className="font-black text-slate-900 text-2xl uppercase tracking-tighter leading-tight bg-slate-50 p-3 rounded-xl border border-slate-100 mb-4">
+                                {order.customer_name || 'Generic Customer'}
+                              </h3>
+                            </div>
+
+                            <div className="space-y-4">
+                              <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl relative group">
+                                <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-1">WhatsApp Primary Hub</p>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-lg font-black text-emerald-700 tracking-tight">{order.whatsapp_number}</span>
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      onClick={() => handleCopy(`${order.id}-wa`, order.whatsapp_number)}
+                                      className="p-2 bg-white text-slate-400 hover:text-brand rounded-lg shadow-sm transition-all"
+                                    >
+                                      {copiedId === `${order.id}-wa` ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                                    </button>
+                                    <a
+                                      href={`https://wa.me/${order.whatsapp_number.replace(/[^0-9]/g, '').startsWith('01') ? '88' + order.whatsapp_number.replace(/[^0-9]/g, '') : order.whatsapp_number.replace(/[^0-9]/g, '')}`}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="p-2 bg-emerald-500 text-white rounded-lg shadow-sm hover:bg-emerald-600 transition-all"
+                                    >
+                                      <MessageSquare className="w-4 h-4" />
+                                    </a>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl">
+                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Shipping Location</p>
+                                <div className="flex items-start gap-2">
+                                  <MapPin className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
+                                  <span className="text-sm font-bold text-slate-700 leading-snug">{order.location}</span>
+                                </div>
+                              </div>
                             </div>
                           </div>
-                          <div className="hidden sm:block text-right">
-                             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Receipt ID</p>
-                             <p className="text-[10px] font-mono text-slate-500 font-bold">{order.id.toUpperCase()}</p>
+
+                          {/* Product & Payload Section (Center) */}
+                          <div className="lg:col-span-5 space-y-6">
+                            <div>
+                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Order Content</p>
+                              <div className="bg-brand/5 border border-brand/10 p-4 rounded-2xl">
+                                {order.product_name && (
+                                  <div className="mb-4">
+                                    <p className="text-[9px] font-black text-brand uppercase tracking-widest mb-1">Product Title</p>
+                                    <h4 className="text-xl font-black text-slate-900 tracking-tighter">{order.product_name}</h4>
+                                  </div>
+                                )}
+                                
+                                <div className="grid grid-cols-2 gap-4 mb-4">
+                                  <div className="bg-white p-3 rounded-xl border border-brand/10 shadow-sm">
+                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Quantity</p>
+                                    <p className="text-lg font-black text-brand">{order.quantity || '1'} Items</p>
+                                  </div>
+                                  <div className="bg-white p-3 rounded-xl border border-brand/10 shadow-sm">
+                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Subtotal</p>
+                                    <p className="text-lg font-black text-slate-900">{formatCurrency(order.price)}</p>
+                                  </div>
+                                </div>
+
+                                <div className="bg-white/50 p-3 rounded-xl border border-brand/5">
+                                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Merchant / Seller</p>
+                                  <div className="flex items-center gap-3">
+                                    {order.seller_logo || (order.seller && sellers[order.seller]?.logo) ? (
+                                      <img 
+                                        src={order.seller_logo || sellers[order.seller!]?.logo} 
+                                        alt="Seller" 
+                                        className="w-8 h-8 rounded-lg object-cover border border-slate-200"
+                                      />
+                                    ) : (
+                                      <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center border border-slate-200">
+                                        <Store className="w-4 h-4 text-slate-400" />
+                                      </div>
+                                    )}
+                                    <span className="font-black text-slate-700 uppercase tracking-tight text-sm">
+                                      {order.seller || 'Bazer BD Admin'}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div>
+                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Instructions / Details</p>
+                              <div className="bg-slate-50 border border-slate-100 p-4 rounded-2xl">
+                                <p className="text-sm font-bold text-slate-600 whitespace-pre-wrap leading-relaxed">
+                                  {order.product_details || 'No additional specifications provided.'}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Management & Status Section (Right) */}
+                          <div className="lg:col-span-3">
+                            <div className="bg-slate-900 rounded-2xl p-5 text-white h-full space-y-6">
+                              <div className="border-b border-white/10 pb-4">
+                                <p className="text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Current Deployment Status</p>
+                                <div className={cn(
+                                  "inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest",
+                                  getStatusColor(order.status)
+                                )}>
+                                  <CheckCircle className="w-3 h-3" />
+                                  {order.status}
+                                </div>
+                              </div>
+
+                              <div className="space-y-3">
+                                <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Update Operational Stage</p>
+                                <div className="grid grid-cols-2 gap-2">
+                                  {['pending', 'packing', 'shipping', 'delivered', 'completed', 'cancelled'].map((status) => (
+                                    <button
+                                      key={status}
+                                      onClick={() => updateStatus(order.id, status as Order['status'])}
+                                      disabled={statusUpdatingId === order.id}
+                                      className={cn(
+                                        "py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all border",
+                                        order.status === status
+                                          ? "bg-white text-slate-900 border-white"
+                                          : "bg-white/5 text-white/60 border-white/10 hover:bg-white/10"
+                                      )}
+                                    >
+                                      {statusUpdatingId === order.id && order.status === status ? <Loader2 className="w-3 h-3 animate-spin mx-auto"/> : status}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+
+                              <div className="pt-4 space-y-3">
+                                <div className="flex items-center gap-2 text-white/40">
+                                  <Clock className="w-3 h-3" />
+                                  <span className="text-[9px] font-black uppercase tracking-widest">{format(new Date(order.created_at), 'PPP')}</span>
+                                </div>
+                                <button
+                                  onClick={() => handleDeleteOrder(order.id)}
+                                  disabled={deletingId === order.id}
+                                  className="w-full py-3 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/20 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                                >
+                                  Purge Record
+                                </button>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-
-                    <div className="flex flex-col items-end gap-6 min-w-[280px] w-full lg:w-auto">
-                      <div className="w-full bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-                        <div className="flex items-center gap-2 text-slate-400 mb-6 pb-4 border-b border-slate-50">
-                          <Clock className="w-4 h-4" />
-                          <span className="text-[11px] font-black uppercase tracking-[0.1em]">
-                            Recorded: {format(new Date(order.created_at), 'PPP p')}
-                          </span>
-                        </div>
-
-                        <div className="space-y-4">
-                          <label className="text-[10px] font-black text-slate-900 uppercase tracking-[0.2em] mb-4 block">Tracking Deployment</label>
-                          <div className="grid grid-cols-2 gap-3">
-                            <button
-                              onClick={() => updateStatus(order.id, 'pending')}
-                              disabled={statusUpdatingId === order.id}
-                              className={cn(
-                                "h-12 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border shadow-sm flex items-center justify-center",
-                                order.status === 'pending' 
-                                  ? "bg-amber-500 text-white border-amber-500 ring-4 ring-amber-100" 
-                                  : "bg-white text-amber-500 border-amber-200 hover:bg-amber-50 active:scale-95"
-                              )}
-                            >
-                              {statusUpdatingId === order.id && order.status === 'pending' ? <Loader2 className="w-3 h-3 animate-spin"/> : "Pending"}
-                            </button>
-                            <button
-                              onClick={() => updateStatus(order.id, 'packing')}
-                              disabled={statusUpdatingId === order.id}
-                              className={cn(
-                                "h-12 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border shadow-sm flex items-center justify-center",
-                                order.status === 'packing' 
-                                  ? "bg-blue-600 text-white border-blue-600 ring-4 ring-blue-100" 
-                                  : "bg-white text-blue-600 border-blue-100 hover:bg-blue-50 active:scale-95"
-                              )}
-                            >
-                              {statusUpdatingId === order.id && order.status === 'packing' ? <Loader2 className="w-3 h-3 animate-spin"/> : "Packing"}
-                            </button>
-                            <button
-                              onClick={() => updateStatus(order.id, 'shipping')}
-                              disabled={statusUpdatingId === order.id}
-                              className={cn(
-                                "h-12 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border shadow-sm flex items-center justify-center",
-                                order.status === 'shipping' 
-                                  ? "bg-indigo-600 text-white border-indigo-600 ring-4 ring-indigo-100" 
-                                  : "bg-white text-indigo-600 border-indigo-100 hover:bg-indigo-50 active:scale-95"
-                              )}
-                            >
-                              {statusUpdatingId === order.id && order.status === 'shipping' ? <Loader2 className="w-3 h-3 animate-spin"/> : "Shipping"}
-                            </button>
-                            <button
-                              onClick={() => updateStatus(order.id, 'delivered')}
-                              disabled={statusUpdatingId === order.id}
-                              className={cn(
-                                "h-12 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border shadow-sm flex items-center justify-center",
-                                order.status === 'delivered' 
-                                  ? "bg-emerald-600 text-white border-emerald-600 ring-4 ring-emerald-100" 
-                                  : "bg-white text-emerald-600 border-emerald-200 hover:bg-emerald-50 active:scale-95"
-                              )}
-                            >
-                              {statusUpdatingId === order.id && order.status === 'delivered' ? <Loader2 className="w-3 h-3 animate-spin"/> : "Delivery"}
-                            </button>
-                            <button
-                              onClick={() => updateStatus(order.id, 'completed')}
-                              disabled={statusUpdatingId === order.id}
-                              className={cn(
-                                "h-12 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border shadow-sm flex items-center justify-center",
-                                order.status === 'completed' 
-                                  ? "bg-slate-900 text-white border-slate-900 ring-4 ring-slate-100" 
-                                  : "bg-white text-slate-900 border-slate-200 hover:bg-slate-50 active:scale-95"
-                              )}
-                            >
-                              {statusUpdatingId === order.id && order.status === 'completed' ? <Loader2 className="w-3 h-3 animate-spin"/> : "Completed"}
-                            </button>
-                            <button
-                              onClick={() => updateStatus(order.id, 'cancelled')}
-                              disabled={statusUpdatingId === order.id}
-                              className={cn(
-                                "h-12 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border shadow-sm flex items-center justify-center",
-                                order.status === 'cancelled' 
-                                  ? "bg-red-600 text-white border-red-600 ring-4 ring-red-100" 
-                                  : "bg-white text-red-600 border-red-200 hover:bg-red-50 active:scale-95"
-                              )}
-                            >
-                              {statusUpdatingId === order.id && order.status === 'cancelled' ? <Loader2 className="w-3 h-3 animate-spin"/> : "Cancel Order"}
-                            </button>
-                          </div>
-                          <button
-                            onClick={() => handleDeleteOrder(order.id)}
-                            disabled={deletingId === order.id}
-                            className="w-full mt-6 py-4 flex items-center justify-center gap-3 text-white bg-slate-900 hover:bg-black rounded-xl text-[11px] font-black uppercase tracking-widest transition-all shadow-sm"
-                          >
-                            {deletingId === order.id ? <Loader2 className="w-4 h-4 animate-spin"/> : <Trash2 className="w-4 h-4" />}
-                            Purge Record
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-            </AnimatePresence>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+            )}
             
             {filteredOrders.length === 0 && (
               <div className="p-12 text-center text-slate-500 bg-slate-50/50 rounded-2xl border-2 border-dashed border-slate-200">

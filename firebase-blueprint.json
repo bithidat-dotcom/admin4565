@@ -92,6 +92,17 @@
         "created_at": { "type": "string", "format": "date-time" }
       },
       "required": ["text", "sender"]
+    },
+    "CouponSettings": {
+      "title": "CouponSettings",
+      "description": "Global coupon toggle and configuration",
+      "type": "object",
+      "properties": {
+        "isActive": { "type": "boolean", "description": "Global activation for coupons" },
+        "minPurchase": { "type": "number", "description": "Min purchase for eligibility" },
+        "discountAmount": { "type": "number", "description": "Discount amount" }
+      },
+      "required": ["isActive", "minPurchase", "discountAmount"]
     }
   },
   "firestore": {
@@ -122,6 +133,10 @@
     "/chats/{chatId}/messages": {
       "schema": "Message",
       "description": "Messages within a conversation"
+    },
+    "/settings/coupon": {
+      "schema": "CouponSettings",
+      "description": "Global coupon configuration"
     }
   }
 }

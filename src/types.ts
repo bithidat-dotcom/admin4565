@@ -39,6 +39,9 @@ export interface Order {
   product_details: string;
   product_name?: string;
   quantity?: number | string;
+  seller?: string;
+  seller_logo?: string;
+  seller_whatsapp?: string;
   user_id?: string;
   cancelled_by?: 'user' | 'admin';
   status: 'pending' | 'packing' | 'shipping' | 'delivered' | 'completed' | 'cancelled';
@@ -86,4 +89,4 @@ export interface Seller {
   created_at: string;
 }
 
-export type View = 'dashboard' | 'products' | 'orders' | 'banners' | 'reviews' | 'users' | 'sellers';
+export type View = 'dashboard' | 'products' | 'orders' | 'banners' | 'reviews' | 'users' | 'sellers' | 'settings' | 'employees';

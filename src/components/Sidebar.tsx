@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, ShoppingBag, ShoppingCart, Image as ImageIcon, ChevronRight, Star, Users, X, Link as LinkIcon, Store } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, ShoppingCart, Image as ImageIcon, ChevronRight, Star, Users, X, Link as LinkIcon, Store, Settings, UserPlus } from 'lucide-react';
 import { View } from '../types';
 import { cn } from '../lib/utils';
 
@@ -15,9 +15,10 @@ export default function Sidebar({ currentView, onViewChange, isOpen = false, onC
     { id: 'dashboard' as View, icon: LayoutDashboard, label: 'Dashboard' },
     { id: 'products' as View, icon: ShoppingBag, label: 'Products' },
     { id: 'orders' as View, icon: ShoppingCart, label: 'Orders' },
+    { id: 'settings' as View, icon: Settings, label: 'Settings' },
+    { id: 'employees' as View, icon: UserPlus, label: 'Employees' },
     { id: 'banners' as View, icon: ImageIcon, label: 'Banners' },
     { id: 'reviews' as View, icon: Star, label: 'Reviews' },
-    { id: 'users' as View, icon: Users, label: 'Customers' },
     { id: 'sellers' as View, icon: Store, label: 'Sellers' },
   ];
 
@@ -54,10 +55,7 @@ export default function Sidebar({ currentView, onViewChange, isOpen = false, onC
           </button>
         </div>
 
-      <nav className="flex-1 p-4 space-y-1.5 mt-6 overflow-y-auto">
-        <div className="px-4 mb-2 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
-          Store Management
-        </div>
+      <nav className="flex-1 p-4 space-y-4 mt-6 overflow-y-auto">
         {menuItems.map((item) => (
           <button
             key={item.id}
@@ -65,27 +63,23 @@ export default function Sidebar({ currentView, onViewChange, isOpen = false, onC
               onViewChange(item.id);
               onClose();
             }}
+            title={item.label}
             className={cn(
-              "w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300 group cursor-pointer",
+              "w-full flex items-center justify-center p-4 rounded-2xl transition-all duration-300 group cursor-pointer",
               currentView === item.id
-                ? "bg-slate-900 text-white shadow-lg shadow-slate-200"
-                : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                ? "bg-slate-900 text-white shadow-lg"
+                : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"
             )}
           >
-            <div className="flex items-center gap-3">
-              <item.icon className={cn(
-                "w-4 h-4",
-                currentView === item.id ? "text-brand" : "text-slate-400 group-hover:text-slate-600"
-              )} />
-              {item.label}
-            </div>
+            <item.icon className={cn(
+              "w-7 h-7",
+              currentView === item.id ? "text-white" : "text-slate-400 group-hover:text-slate-600"
+            )} />
             {item.id === 'orders' && (
               <span className={cn(
-                "text-[8px] px-1.5 py-0.5 rounded-md font-black uppercase tracking-tighter",
-                currentView === item.id ? "bg-brand text-white" : "bg-emerald-500 text-white"
-              )}>
-                Live
-              </span>
+                "absolute top-3 right-3 w-2.5 h-2.5 rounded-full",
+                currentView === item.id ? "bg-white" : "bg-red-500"
+              )} />
             )}
           </button>
         ))}

@@ -18,6 +18,8 @@ import {
   Smartphone, 
   Bot, 
   Laptop, 
+  ArrowLeft,
+  Home, 
   Layers, 
   Dumbbell, 
   ShoppingBasket,
@@ -35,6 +37,7 @@ import { formatCurrency, cn } from '../lib/utils';
 interface ProductsPageProps {
   defaultCategory?: string;
   onCategoryFilterChange?: (category: string) => void;
+  onViewChange?: (view: any) => void;
 }
 
 const categoryFilters = [
@@ -103,7 +106,7 @@ function DiscountTimer({ expiresAt }: { expiresAt: string }) {
   );
 }
 
-export default function ProductsPage({ defaultCategory = 'All', onCategoryFilterChange }: ProductsPageProps = {}) {
+export default function ProductsPage({ defaultCategory = 'All', onCategoryFilterChange, onViewChange }: ProductsPageProps = {}) {
   const [products, setProducts] = useState<Product[]>([]);
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1299,6 +1302,20 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
           </div>
         </div>
       </Modal>
+
+      {/* Floating Back to Dashboard Button for Better Scrolling UX */}
+      {onViewChange && (
+        <button 
+          onClick={() => onViewChange('dashboard')} 
+          className="fixed bottom-6 right-6 z-50 bg-slate-900 border border-slate-800 text-white p-4 rounded-full shadow-2xl hover:bg-black transition-all hover:scale-110 flex items-center justify-center cursor-pointer group"
+          title="Back to Dashboard"
+        >
+          <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+          <span className="max-w-0 overflow-hidden group-hover:max-w-[124px] transition-all duration-300 font-extrabold text-[10px] uppercase tracking-widest pl-0 group-hover:pl-2 whitespace-nowrap">
+            Back to Dashboard
+          </span>
+        </button>
+      )}
     </div>
   );
 }

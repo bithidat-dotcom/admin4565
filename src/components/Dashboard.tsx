@@ -21,7 +21,9 @@ import {
   Monitor, 
   Layers, 
   Trophy, 
-  ShoppingBasket 
+  ShoppingBasket,
+  PenTool,
+  Check
 } from 'lucide-react';
 import { formatCurrency, cn } from '../lib/utils';
 import { Order, Product } from '../types';
@@ -55,12 +57,15 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
     pendingOrders: 0,
     totalReviews: 0,
     totalUsers: 0,
+    totalSellers: 0,
   });
   const [orders, setOrders] = useState<Order[]>([]);
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [productsList, setProductsList] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
+  const [boardNote, setBoardNote] = useState(() => localStorage.getItem('dashboard_define_note') || 'Welcome to the pseller company app! Set daily target numbers, notice highlights, or custom operational parameters here.');
+  const [isNoteEditing, setIsNoteEditing] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -132,12 +137,21 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
       }));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'users'));
 
+    // Listen to sellers count
+    const unsubscribeSellers = onSnapshot(collection(db, 'sellers'), (snapshot) => {
+      setStats(prev => ({
+        ...prev,
+        totalSellers: snapshot.size
+      }));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'sellers'));
+
     return () => {
       unsubscribeOrders();
       unsubscribeProducts();
       unsubscribeBanners();
       unsubscribeReviews();
       unsubscribeUsers();
+      unsubscribeSellers();
     };
   }, []);
 
@@ -149,7 +163,7 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
     { label: 'DELIVERY REVENUE', value: formatCurrency(stats.totalRevenue), icon: TrendingUp, color: 'text-emerald-500', bg: 'bg-emerald-50', change: 'Live from Firestore', changeColor: 'text-emerald-500' },
     { label: 'LIVE ORDERS', value: stats.totalOrders.toString(), icon: ShoppingCart, color: 'text-brand', bg: 'bg-indigo-50', change: `${stats.pendingOrders} pending confirmation`, changeColor: 'text-brand' },
     { label: 'STORE PRODUCTS', value: stats.totalProducts.toString(), icon: ShoppingBag, color: 'text-brand-dark', bg: 'bg-slate-100', change: `${totalStock} in stock • ${totalSold} sold • Value: ${formatCurrency(totalInventoryValue)}`, changeColor: 'text-blue-500' },
-    { label: 'MEMBERS BASE', value: stats.totalUsers.toString(), icon: Users, color: 'text-indigo-500', bg: 'bg-indigo-50', change: 'Registered users', changeColor: 'text-indigo-500' },
+    { label: 'MEMBERS BASE', value: stats.totalSellers.toString(), icon: Users, color: 'text-indigo-500', bg: 'bg-indigo-50', change: `${stats.totalUsers} registered customers`, changeColor: 'text-indigo-500' },
   ];
 
   const cancelledOrders = recentOrders.filter(o => o.status === 'cancelled').slice(0, 3);
@@ -212,6 +226,58 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
                   </p>
                 </div>
               ))}
+            </div>
+
+            {/* Dashboard Workspace / Definition Pen Tool Memo Board */}
+            <div className="bg-slate-900 text-white rounded-3xl p-6 border border-slate-800 shadow-xl relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-brand/10 border border-brand/20 text-brand rounded-2xl">
+                    <PenTool className="w-5 h-5 text-indigo-400" />
+                  </div>
+                  <div>
+                    <h2 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">Dashboard Definition Pad</h2>
+                    <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Set workspace guidelines and metrics</p>
+                  </div>
+                </div>
+                
+                <button
+                  onClick={() => {
+                    if (isNoteEditing) {
+                      localStorage.setItem('dashboard_define_note', boardNote);
+                    }
+                    setIsNoteEditing(!isNoteEditing);
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 hover:bg-white text-white hover:text-slate-900 border border-white/15 text-[10px] font-black uppercase tracking-widest transition-all duration-300 cursor-pointer"
+                >
+                  {isNoteEditing ? (
+                    <>
+                      <Check className="w-3.5 h-3.5" />
+                      Save Definition
+                    </>
+                  ) : (
+                    <>
+                      <PenTool className="w-3.5 h-3.5" />
+                      Edit Pad
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {isNoteEditing ? (
+                <textarea
+                  value={boardNote}
+                  onChange={(e) => setBoardNote(e.target.value)}
+                  className="w-full bg-slate-950/50 border border-slate-800 focus:border-indigo-500/50 focus:outline-none rounded-2xl p-4 text-xs font-bold leading-relaxed text-slate-200 uppercase"
+                  rows={3}
+                  placeholder="Define targets, guidelines, or notice content for this dashboard session..."
+                />
+              ) : (
+                <div className="p-4 bg-slate-950/40 border border-slate-800/60 rounded-2xl text-xs font-mono leading-relaxed text-slate-200 uppercase tracking-wide">
+                  {boardNote}
+                </div>
+              )}
             </div>
 
             {/* Charts Section */}

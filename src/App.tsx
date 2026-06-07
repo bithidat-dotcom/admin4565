@@ -7,6 +7,8 @@ import BannersPage from './components/BannersPage';
 import ReviewsPage from './components/ReviewsPage';
 import UsersPage from './components/UsersPage';
 import SellersPage from './components/SellersPage';
+import SettingsPage from './components/SettingsPage';
+import EmployeesPage from './components/EmployeesPage';
 import LoginPage from './components/LoginPage';
 import LinkConverterModal from './components/LinkConverterModal';
 import { View } from './types';
@@ -160,6 +162,7 @@ export default function App() {
           <ProductsPage 
             defaultCategory={filterCategory}
             onCategoryFilterChange={setFilterCategory}
+            onViewChange={setCurrentView}
           />
         );
       case 'orders':
@@ -172,6 +175,10 @@ export default function App() {
         return <UsersPage onViewChange={setCurrentView} />;
       case 'sellers':
         return <SellersPage />;
+      case 'settings':
+        return <SettingsPage />;
+      case 'employees':
+        return <EmployeesPage />;
       default:
         return <Dashboard onViewChange={setCurrentView} />;
     }
