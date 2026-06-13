@@ -4,7 +4,7 @@ import { collection, onSnapshot, query, orderBy, addDoc, deleteDoc, doc, serverT
 import { Banner } from '../types';
 import Header from '../components/Header';
 import Modal from '../components/Modal';
-import { Trash2, Loader2, Image as ImageIcon } from 'lucide-react';
+import { Trash2, Loader2, Image as ImageIcon, Eye } from 'lucide-react';
 import { cn } from '../lib/utils';
 import ImageUploader from './ImageUploader';
 
@@ -17,6 +17,7 @@ export default function BannersPage() {
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [activeBannerId, setActiveBannerId] = useState<string | null>(null);
+  const [previewBanner, setPreviewBanner] = useState<Banner | null>(null);
 
   useEffect(() => {
     const q = query(collection(db, 'banners'), orderBy('created_at', 'desc'));
@@ -99,11 +100,21 @@ export default function BannersPage() {
                 </div>
                 
                 <div className={cn(
-                  "absolute top-4 right-4 transition-all duration-300",
+                  "absolute top-4 right-4 transition-all duration-300 flex flex-col gap-2",
                   activeBannerId === banner.id 
                     ? "translate-y-0 opacity-100 pointer-events-auto" 
                     : "translate-y-2 opacity-0 md:group-hover:translate-y-0 md:group-hover:opacity-100 pointer-events-none md:pointer-events-auto"
                 )}>
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPreviewBanner(banner);
+                    }}
+                    className="p-4 bg-white/90 text-slate-800 rounded-2xl shadow-2xl hover:bg-white transition-all hover:scale-110 cursor-pointer"
+                    title="Preview banner"
+                  >
+                     <Eye className="w-5 h-5" />
+                  </button>
                   <button 
                     onClick={(e) => {
                       e.stopPropagation();
@@ -190,6 +201,14 @@ export default function BannersPage() {
             </button>
           </div>
         </form>
+      </Modal>
+
+      <Modal isOpen={!!previewBanner} onClose={() => setPreviewBanner(null)} title={`Preview: ${previewBanner?.title || 'Banner'}`} fullScreen={true}>
+        {previewBanner && (
+          <div className="w-full h-full flex items-center justify-center">
+            <img src={previewBanner.image} alt={previewBanner.title} className="max-w-full max-h-full object-contain rounded-2xl" />
+          </div>
+        )}
       </Modal>
     </div>
   );

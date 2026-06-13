@@ -159,11 +159,21 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
   const totalSold = productsList.reduce((sum, p) => sum + (p.sold ?? 0), 0);
   const totalInventoryValue = productsList.reduce((sum, p) => sum + ((p.stock ?? 0) * p.price), 0);
 
+  const pastEarn = orders.reduce((sum, order) => 
+    sum + (['delivered', 'completed'].includes(order.status) ? Number(order.price || 0) : 0), 0
+  );
+
+  const futureEarn = orders.reduce((sum, order) => 
+    sum + (['pending', 'packing', 'shipping'].includes(order.status) ? Number(order.price || 0) : 0), 0
+  );
+
   const statCards = [
-    { label: 'DELIVERY REVENUE', value: formatCurrency(stats.totalRevenue), icon: TrendingUp, color: 'text-emerald-500', bg: 'bg-emerald-50', change: 'Live from Firestore', changeColor: 'text-emerald-500' },
-    { label: 'LIVE ORDERS', value: stats.totalOrders.toString(), icon: ShoppingCart, color: 'text-brand', bg: 'bg-indigo-50', change: `${stats.pendingOrders} pending confirmation`, changeColor: 'text-brand' },
-    { label: 'STORE PRODUCTS', value: stats.totalProducts.toString(), icon: ShoppingBag, color: 'text-brand-dark', bg: 'bg-slate-100', change: `${totalStock} in stock • ${totalSold} sold • Value: ${formatCurrency(totalInventoryValue)}`, changeColor: 'text-blue-500' },
-    { label: 'MEMBERS BASE', value: stats.totalSellers.toString(), icon: Users, color: 'text-indigo-500', bg: 'bg-indigo-50', change: `${stats.totalUsers} registered customers`, changeColor: 'text-indigo-500' },
+    { label: 'PAST EARN (REALIZED)', value: formatCurrency(pastEarn), icon: TrendingUp, color: 'text-emerald-500', bg: 'bg-emerald-50/70 border border-emerald-100', change: 'Delivered or Completed', changeColor: 'text-emerald-500' },
+    { label: 'FUTURE EARN (PENDING)', value: formatCurrency(futureEarn), icon: TrendingUp, color: 'text-amber-500', bg: 'bg-amber-50/70 border border-amber-100', change: 'Awaiting Fulfillment', changeColor: 'text-amber-500' },
+    { label: 'DELIVERY REVENUE', value: formatCurrency(stats.totalRevenue), icon: TrendingUp, color: 'text-indigo-500', bg: 'bg-indigo-50/75 border border-indigo-100', change: 'Active & complete', changeColor: 'text-indigo-550' },
+    { label: 'LIVE ORDERS', value: stats.totalOrders.toString(), icon: ShoppingCart, color: 'text-brand', bg: 'bg-indigo-50/70 border border-indigo-100', change: `${stats.pendingOrders} pending check`, changeColor: 'text-brand' },
+    { label: 'PRODUCTS TOTAL', value: stats.totalProducts.toString(), icon: ShoppingBag, color: 'text-slate-700', bg: 'bg-slate-50 border border-slate-200/60', change: `${totalStock} in stock • ${totalSold} sold`, changeColor: 'text-slate-500' },
+    { label: 'SELLERS BASE', value: stats.totalSellers.toString(), icon: Users, color: 'text-purple-500', bg: 'bg-purple-50 border border-purple-100', change: `${stats.totalUsers} customers`, changeColor: 'text-purple-550' },
   ];
 
   const cancelledOrders = recentOrders.filter(o => o.status === 'cancelled').slice(0, 3);
@@ -203,25 +213,27 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
         ) : (
           <>
             {/* Stat Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
               {statCards.map((stat, i) => (
-                <div key={i} className="bg-white p-6 rounded-2xl border border-slate-200/60 shadow-sm hover:shadow-md transition-all duration-300 group">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className={cn("p-2.5 rounded-xl transition-colors duration-300", stat.bg, "group-hover:bg-slate-900 group-hover:text-white")}>
-                      <stat.icon className={cn("w-5 h-5", stat.color, "group-hover:text-white")} />
+                <div key={i} className="bg-white p-5 rounded-2xl border border-slate-200/60 shadow-sm hover:shadow-md transition-all duration-300 group flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className={cn("p-2 rounded-xl transition-colors duration-300", stat.bg, "group-hover:bg-slate-100 group-hover:text-slate-800")}>
+                        <stat.icon className={cn("w-4.5 h-4.5", stat.color)} />
+                      </div>
+                      {stat.label === 'SELLERS BASE' && (
+                        <button 
+                          onClick={() => onViewChange?.('users')}
+                          className="text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all cursor-pointer"
+                        >
+                          VIEW
+                        </button>
+                      )}
                     </div>
-                    {stat.label === 'MEMBERS BASE' && (
-                      <button 
-                        onClick={() => onViewChange?.('users')}
-                        className="text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all cursor-pointer"
-                      >
-                        VIEW ALL
-                      </button>
-                    )}
+                    <div className="text-[9px] font-black text-slate-400 uppercase tracking-[0.15em] mb-1 line-clamp-1">{stat.label}</div>
+                    <div className="text-xl font-black text-slate-900 leading-none tracking-tighter truncate">{stat.value}</div>
                   </div>
-                  <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">{stat.label}</div>
-                  <div className="text-2xl font-black text-slate-900 leading-none tracking-tighter">{stat.value}</div>
-                  <p className="text-[10px] font-bold text-slate-400 mt-4 flex items-center gap-1.5 uppercase tracking-wider">
+                  <p className="text-[9px] font-bold text-slate-400 mt-3 flex items-center gap-1.5 uppercase tracking-wider truncate">
                      {stat.change}
                   </p>
                 </div>
@@ -229,16 +241,16 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
             </div>
 
             {/* Dashboard Workspace / Definition Pen Tool Memo Board */}
-            <div className="bg-slate-900 text-white rounded-3xl p-6 border border-slate-800 shadow-xl relative overflow-hidden group">
-              <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-brand/10 border border-brand/20 text-brand rounded-2xl">
-                    <PenTool className="w-5 h-5 text-indigo-400" />
+                  <div className="p-2.5 bg-indigo-50/60 border border-indigo-100/40 text-indigo-600 rounded-2xl">
+                    <PenTool className="w-5 h-5 text-indigo-500" />
                   </div>
                   <div>
-                    <h2 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">Dashboard Definition Pad</h2>
-                    <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Set workspace guidelines and metrics</p>
+                    <h2 className="text-xs font-black uppercase tracking-[0.2em] text-slate-700">Dashboard Definition Pad</h2>
+                    <p className="text-[9px] text-slate-450 font-bold uppercase tracking-wider">Set workspace guidelines and metrics</p>
                   </div>
                 </div>
                 
@@ -249,16 +261,16 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
                     }
                     setIsNoteEditing(!isNoteEditing);
                   }}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 hover:bg-white text-white hover:text-slate-900 border border-white/15 text-[10px] font-black uppercase tracking-widest transition-all duration-300 cursor-pointer"
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-50 hover:bg-slate-100/80 text-slate-700 border border-slate-200 text-[10px] font-black uppercase tracking-widest transition-all duration-300 cursor-pointer shadow-sm"
                 >
                   {isNoteEditing ? (
                     <>
-                      <Check className="w-3.5 h-3.5" />
+                      <Check className="w-3.5 h-3.5 text-emerald-500" />
                       Save Definition
                     </>
                   ) : (
                     <>
-                      <PenTool className="w-3.5 h-3.5" />
+                      <PenTool className="w-3.5 h-3.5 text-slate-500" />
                       Edit Pad
                     </>
                   )}
@@ -269,12 +281,12 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
                 <textarea
                   value={boardNote}
                   onChange={(e) => setBoardNote(e.target.value)}
-                  className="w-full bg-slate-950/50 border border-slate-800 focus:border-indigo-500/50 focus:outline-none rounded-2xl p-4 text-xs font-bold leading-relaxed text-slate-200 uppercase"
+                  className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500/55 focus:outline-none rounded-2xl p-4 text-xs font-bold leading-relaxed text-slate-700 uppercase"
                   rows={3}
                   placeholder="Define targets, guidelines, or notice content for this dashboard session..."
                 />
               ) : (
-                <div className="p-4 bg-slate-950/40 border border-slate-800/60 rounded-2xl text-xs font-mono leading-relaxed text-slate-200 uppercase tracking-wide">
+                <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-mono leading-relaxed text-slate-600 uppercase tracking-wide">
                   {boardNote}
                 </div>
               )}

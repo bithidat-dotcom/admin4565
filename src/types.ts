@@ -79,6 +79,7 @@ export interface User {
 
 export interface Seller {
   id: string;
+  seller_id?: string;
   name: string;
   logo: string;
   whatsapp_number: string;
@@ -87,6 +88,8 @@ export interface Seller {
   instagram?: string;
   tiktok?: string;
   created_at: string;
+  is_verified?: boolean;
+  rating?: number;
 }
 
 export type View = 'dashboard' | 'products' | 'orders' | 'banners' | 'reviews' | 'users' | 'sellers' | 'settings' | 'employees';

@@ -414,10 +414,21 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
       <div className="px-4 md:px-8 mt-4">
         <div className="bg-white/75 p-4 rounded-2xl border border-slate-200/60 shadow-sm">
           <div className="flex items-center justify-between mb-3 px-1">
-            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-brand" />
-              Category Registry Shortcuts
-            </h4>
+            <div className="flex items-center gap-3">
+              {onViewChange && (
+                <button
+                  onClick={() => onViewChange('dashboard')}
+                  className="flex items-center gap-1 px-2 py-1 bg-indigo-50 border border-indigo-150/40 hover:bg-indigo-600 hover:text-white text-indigo-700 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer"
+                >
+                  <ArrowLeft className="w-3 h-3" />
+                  Dashboard
+                </button>
+              )}
+              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-brand" />
+                Category Registry Shortcuts
+              </h4>
+            </div>
             <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider lg:inline hidden">
               Scroll Horizontally &rarr;
             </span>
@@ -1307,7 +1318,7 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
       {onViewChange && (
         <button 
           onClick={() => onViewChange('dashboard')} 
-          className="fixed bottom-6 right-6 z-50 bg-slate-900 border border-slate-800 text-white p-4 rounded-full shadow-2xl hover:bg-black transition-all hover:scale-110 flex items-center justify-center cursor-pointer group"
+          className="fixed bottom-6 right-6 z-50 bg-white border border-slate-205 text-slate-700 p-4 rounded-full shadow-2xl hover:bg-slate-50 hover:text-slate-900 transition-all hover:scale-110 flex items-center justify-center cursor-pointer group"
           title="Back to Dashboard"
         >
           <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
