@@ -5,8 +5,9 @@ import { Order } from '../types';
 import Header from '../components/Header';
 import Modal from './Modal';
 import OrderTableView from './OrderTableView';
+import LoadingDots from './LoadingDots';
 import { Loader2, Phone, MapPin, Package, Clock, CheckCircle, Search, Trash2, ShieldCheck, Lock, Copy, Check, MessageSquare, Store } from 'lucide-react';
-import { formatCurrency, cn } from '../lib/utils';
+import { formatCurrency, cn, exportToCSV } from '../lib/utils';
 import { format, isSameDay } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
 import { Calendar } from 'lucide-react';
@@ -232,6 +233,13 @@ export default function OrdersPage() {
               Select All
             </div>
 
+            <button 
+                onClick={() => exportToCSV(filteredOrders, 'orders')}
+                className="bg-white border border-indigo-200 text-indigo-600 rounded-xl px-4 py-2 text-xs font-black uppercase tracking-widest hover:bg-indigo-50 transition-colors"
+            >
+                Export CSV
+            </button>
+
             <div className="bg-white border border-slate-200 rounded-xl px-4 py-2.5 flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
               <Calendar className="w-4 h-4 text-slate-400" />
               <input 
@@ -269,7 +277,7 @@ export default function OrdersPage() {
 
         {loading ? (
           <div className="flex items-center justify-center h-64">
-            <Loader2 className="w-8 h-8 text-brand animate-spin" />
+            <LoadingDots />
           </div>
         ) : (
           <div className="space-y-4">

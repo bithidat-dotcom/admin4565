@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
 import Header from '../components/Header';
+import LoadingDots from './LoadingDots';
 import { 
   ShoppingBag, 
   ShoppingCart, 
@@ -208,7 +209,7 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
       <main className="p-4 md:p-8 space-y-4 md:space-y-8 w-full">
         {loading ? (
           <div className="flex items-center justify-center h-64">
-            <Loader2 className="w-8 h-8 text-brand animate-spin" />
+            <LoadingDots />
           </div>
         ) : (
           <>

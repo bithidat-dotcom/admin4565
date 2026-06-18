@@ -4,6 +4,7 @@ import { collection, onSnapshot, query, orderBy, addDoc, deleteDoc, doc, serverT
 import { Banner } from '../types';
 import Header from '../components/Header';
 import Modal from '../components/Modal';
+import LoadingDots from './LoadingDots';
 import { Trash2, Loader2, Image as ImageIcon, Eye } from 'lucide-react';
 import { cn } from '../lib/utils';
 import ImageUploader from './ImageUploader';
@@ -79,7 +80,7 @@ export default function BannersPage() {
       <main className="p-4 md:p-8 w-full">
         {loading ? (
           <div className="flex items-center justify-center h-64">
-            <Loader2 className="w-8 h-8 text-brand animate-spin" />
+            <LoadingDots />
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-8">

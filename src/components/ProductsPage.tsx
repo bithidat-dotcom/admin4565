@@ -4,6 +4,8 @@ import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, d
 import { Product, Seller } from '../types';
 import Header from '../components/Header';
 import Modal from '../components/Modal';
+import LoadingDots from './LoadingDots';
+import { exportToCSV } from '../lib/utils';
 import { 
   Edit2, 
   Trash2, 
@@ -480,12 +482,18 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
           <option value="All">All Categories</option>
           {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
         </select>
+        <button 
+                onClick={() => exportToCSV(filteredProducts, 'products')}
+                className="bg-white border border-indigo-200 text-indigo-600 rounded-lg px-4 py-3 sm:py-2 text-xs font-black uppercase tracking-widest hover:bg-indigo-50 transition-colors"
+            >
+                Export CSV
+            </button>
       </div>
 
       <main className="p-4 md:p-8 w-full">
         {loading ? (
           <div className="flex items-center justify-center h-64">
-            <Loader2 className="w-8 h-8 text-brand animate-spin" />
+            <LoadingDots />
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
