@@ -9,12 +9,13 @@ import UsersPage from './components/UsersPage';
 import SellersPage from './components/SellersPage';
 import LoginPage from './components/LoginPage';
 import LinkConverterModal from './components/LinkConverterModal';
+import PopupAd from './components/PopupAd';
 import { View } from './types';
 import { motion, AnimatePresence } from 'motion/react';
 import { db } from './lib/firebase';
-import { collection, onSnapshot, query, where, getDocs, updateDoc, doc } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, getDocs, updateDoc, doc } from 'firebase/firestore';                
 
-export default function App() {
+export default function App() {                
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -180,6 +181,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-brand-light selection:text-brand-dark">
+      <PopupAd />                
       <Sidebar 
         currentView={currentView} 
         onViewChange={setCurrentView} 

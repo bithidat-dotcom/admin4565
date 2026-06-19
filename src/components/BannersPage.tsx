@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, onSnapshot, query, orderBy, addDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, addDoc, deleteDoc, doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { Banner } from '../types';
 import Header from '../components/Header';
 import Modal from '../components/Modal';
 import LoadingDots from './LoadingDots';
-import { Trash2, Loader2, Image as ImageIcon, Eye } from 'lucide-react';
+import { Trash2, Loader2, Image as ImageIcon, Eye, Megaphone } from 'lucide-react';
 import { cn } from '../lib/utils';
 import ImageUploader from './ImageUploader';
 
@@ -117,6 +117,25 @@ export default function BannersPage() {
                      <Eye className="w-5 h-5" />
                   </button>
                   <button 
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      try {
+                        await setDoc(doc(db, 'settings', 'adPopup'), { isActive: true, bannerId: banner.id }, { merge: true });
+                        // Clear the seen flag so user can see it right away for verification
+                        localStorage.removeItem(`popupSeen_${banner.id}`);
+                        alert("Banner published as active Ad Popup! Refresh your app to see the change if needed, or it may appear instantly.");
+                      } catch (err) {
+                        console.error(err);
+                        alert("Failed to set ad popup.");
+                      }
+                    }}
+                    className="p-4 bg-white/90 text-brand rounded-2xl shadow-2xl hover:bg-white transition-all hover:scale-110 cursor-pointer group/megaphone relative"
+                    title="Set as popup"
+                  >
+                    <Megaphone className="w-5 h-5" />
+                    <span className="absolute -top-12 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover/megaphone:opacity-100 transition-opacity whitespace-nowrap">SET AS AD POPUP</span>
+                  </button>
+                  <button 
                     onClick={(e) => {
                       e.stopPropagation();
                       handleDelete(banner.id);
@@ -181,7 +200,7 @@ export default function BannersPage() {
               onChange={setNewImageUrl}
               folder="banners"
             />
-            <p className="text-[10px] text-slate-400 font-semibold italic">* Recommended aspect ratio: 21:9 for best visual performance.</p>
+            <p className="text-[10px] text-slate-400 font-semibold italic">* Recommended: 21:9 (Store Header), 9:16 or 4:3 (Ad Popup).</p>
           </div>
           
           <div className="pt-4 flex gap-4">

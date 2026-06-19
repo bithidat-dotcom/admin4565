@@ -578,6 +578,10 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
                 <div className="p-5">
                   <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">SKU: {product.id.slice(0, 8)}</div>
                   <h3 className="font-bold text-slate-900 line-clamp-1 text-sm uppercase">{product.name}</h3>
+                  <div className="flex justify-between items-center mt-2">
+                      <span className="font-black text-brand text-sm">{formatCurrency(product.price)}</span>
+                      <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded", (product.stock || 0) > 0 ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700")}>{(product.stock || 0)} left</span>
+                  </div>
                   <p className="text-slate-500 text-xs mt-2 line-clamp-2 min-h-[32px] leading-relaxed">
                     {product.description}
                   </p>

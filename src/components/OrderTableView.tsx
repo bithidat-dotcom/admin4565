@@ -3,6 +3,8 @@ import { Order } from '../types';
 import { cn, formatCurrency } from '../lib/utils';
 import { Printer } from 'lucide-react';
 import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import QRCode from 'qrcode';
 import { format } from 'date-fns';
 
 interface OrderTableViewProps {
@@ -25,50 +27,129 @@ export default function OrderTableView({ orders, onStatusChange, statusUpdatingI
   };
 
   const handlePrint = async (order: Order) => {
-    if (!window.confirm("Do you want to print this order?")) {
+    if (!window.confirm("Do you want to print this order invoice?")) {
       return;
     }
 
     const doc = new jsPDF();
+    const qrData = `https://bazer-bd.vercel.app/order/${order.id}`; // Hypothetical storefront tracking link
     
     // Add Logo
     try {
       const img = new Image();
+      // Using the user's provided logo URL from previous turns
       img.src = 'https://i.postimg.cc/KvqR53hq/download-(1).png';
       await new Promise((resolve) => { img.onload = resolve; });
-      doc.addImage(img, 'PNG', 12, 10, 30, 15);
+      doc.addImage(img, 'PNG', 12, 10, 40, 18);
     } catch (e) {
       console.error("Failed to load logo", e);
+      doc.setFontSize(22);
+      doc.setTextColor(30, 41, 59);
+      doc.text("BAZER_BD", 12, 22);
     }
 
-    doc.setFontSize(18);
-    doc.text(`BAZER_BD`, 45, 20);
-    doc.setFontSize(10);
-    doc.text(`Invoice generated on: ${format(new Date(), 'PPpp')}`, 12, 30);
-    doc.setDrawColor(220, 225, 230);
-    doc.line(10, 35, 200, 35);
+    // QR Code for Tracking
+    try {
+      const qrDataUrl = await QRCode.toDataURL(qrData);
+      doc.addImage(qrDataUrl, 'PNG', 165, 10, 30, 30);
+      doc.setFontSize(7);
+      doc.setTextColor(100, 116, 139);
+      doc.text("SCAN TO TRACK", 170, 42);
+    } catch (e) {
+      console.error("Failed to generate QR code", e);
+    }
 
-    // User Details Box
+    doc.setTextColor(30, 41, 59);
+    doc.setFontSize(10);
+    doc.text(`Official Invoice & Shipping Label`, 60, 20);
+    doc.setFontSize(8);
+    doc.text(`Printed: ${format(new Date(), 'PPpp')}`, 60, 25);
+    
+    doc.setDrawColor(226, 232, 240);
+    doc.line(10, 45, 200, 45);
+
+    // Shipping & Customer Info Section
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text("SHIP TO:", 12, 55);
+    doc.setFont('helvetica', 'normal');
+    doc.text(order.customer_name.toUpperCase(), 12, 62);
+    doc.setFontSize(9);
+    doc.text(`Contact: ${order.whatsapp_number}`, 12, 68);
+    
+    // Multi-line address handling
+    const splitAddress = doc.splitTextToSize(order.location, 80);
+    doc.text(splitAddress, 12, 74);
+
+    // Order Meta Info
+    doc.setFont('helvetica', 'bold');
+    doc.text("ORDER INFO:", 110, 55);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Ref ID: #${order.id.slice(0, 8).toUpperCase()}`, 110, 62);
+    doc.text(`Date: ${order.created_at ? format(new Date(order.created_at), 'PPP') : 'N/A'}`, 110, 68);
+    doc.text(`Seller: ${order.seller || 'BAZER_BD Official'}`, 110, 74);
+    
+    // Status Badge
+    doc.setFillColor(248, 250, 252);
+    doc.roundedRect(110, 78, 60, 10, 2, 2, 'F');
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`STATUS: ${order.status.toUpperCase()}`, 115, 84);
+
+    // Items Table
     doc.setFontSize(11);
-    doc.rect(10, 40, 190, 30);
-    doc.text(`Order Reference: ${order.id.slice(0, 8).toUpperCase()}`, 12, 45);
-    doc.text(`Customer Name: ${order.customer_name}`, 12, 53);
-    doc.text(`Phone: ${order.whatsapp_number}`, 12, 61);
-    doc.text(`Location: ${order.location}`, 12, 69);
+    doc.text("ORDER ITEMS", 12, 105);
     
-    // Product Details
-    doc.setFontSize(12);
-    doc.text(`Order Details`, 12, 80);
-    doc.setFontSize(10);
-    doc.text(`Product: ${order.product_name || 'Item'}`, 12, 90);
-    doc.text(`Quantity: ${order.quantity || 1}`, 12, 98);
-    doc.text(`Seller: ${order.seller || 'N/A'}`, 12, 106);
-    
-    // Signature
-    doc.text('Signature:', 150, 250);
-    doc.line(150, 260, 190, 260);
+    autoTable(doc, {
+      startY: 110,
+      head: [['SL', 'Item Description', 'Seller', 'Qty', 'Unit Price', 'Total']],
+      body: [
+        [
+          '1',
+          order.product_name || 'Generic Item',
+          order.seller || 'N/A',
+          order.quantity || 1,
+          formatCurrency(order.price),
+          formatCurrency((Number(order.quantity) || 1) * order.price)
+        ]
+      ],
+      headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold' },
+      bodyStyles: { textColor: [51, 65, 85] },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      margin: { left: 10, right: 10 },
+      theme: 'grid'
+    });
 
-    doc.save(`order_${order.id}.pdf`);
+    // Summary Box
+    const finalY = (doc as any).lastAutoTable.finalY + 10;
+    doc.setDrawColor(30, 41, 59);
+    doc.setLineWidth(0.5);
+    doc.line(130, finalY, 200, finalY);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text("SUBTOTAL:", 130, finalY + 10);
+    doc.text(formatCurrency((Number(order.quantity) || 1) * order.price), 200, finalY + 10, { align: 'right' });
+    
+    doc.text("GRAND TOTAL:", 130, finalY + 20);
+    doc.text(formatCurrency((Number(order.quantity) || 1) * order.price), 200, finalY + 20, { align: 'right' });
+
+    // Parcel Footer / Attachment Clause
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(148, 163, 184);
+    doc.text("Note: This document serves as a parcel attachment for shipping.", 12, finalY + 40);
+    doc.text("Verify the seal and contents upon arrival.", 12, finalY + 45);
+
+    // Signature Area
+    doc.setTextColor(30, 41, 59);
+    doc.setFontSize(10);
+    doc.text('Receiver\'s Signature:', 12, 260);
+    doc.line(12, 270, 70, 270);
+    
+    doc.text('Authorized Signature:', 130, 260);
+    doc.line(130, 270, 190, 270);
+
+    doc.save(`BAZER_INVOICE_${order.id.slice(0, 8)}.pdf`);
   };
 
   return (
