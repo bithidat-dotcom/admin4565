@@ -65,7 +65,7 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
   const [productsList, setProductsList] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
-  const [boardNote, setBoardNote] = useState(() => localStorage.getItem('dashboard_define_note') || 'Welcome to the pseller company app! Set daily target numbers, notice highlights, or custom operational parameters here.');
+  const [boardNote, setBoardNote] = useState(() => localStorage.getItem('dashboard_define_note') || 'Welcome to the pbazar admin hub! Set daily target numbers, notice highlights, or custom operational parameters here.');
   const [isNoteEditing, setIsNoteEditing] = useState(false);
 
   useEffect(() => {
@@ -213,6 +213,22 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
           </div>
         ) : (
           <>
+            {/* Logo Section */}
+            <div className="mb-6 flex items-center gap-6">
+              <div className="w-16 h-16 bg-white rounded-2xl border border-slate-200 shadow-sm flex items-center justify-center p-2 relative group overflow-hidden">
+                <img src="https://i.postimg.cc/KvqR53hq/download-(1).png" alt="pbazar" className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-110" />
+                <div className="absolute inset-0 bg-brand/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter leading-none">
+                  pbazar <span className="text-brand">Admin Area</span>
+                </h1>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-2">
+                  Official Commerce Hub • DHAKA, BD
+                </p>
+              </div>
+            </div>
+
             {/* Stat Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
               {statCards.map((stat, i) => (

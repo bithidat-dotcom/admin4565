@@ -310,7 +310,7 @@ export default function SellersPage() {
               <Award className="w-8 h-8" />
             </div>
             <div>
-              <h2 className="text-sm font-black uppercase tracking-[0.2em] text-slate-800">Bazer Authorized Partner Program</h2>
+              <h2 className="text-sm font-black uppercase tracking-[0.2em] text-slate-800">pbazar Authorized Partner Program</h2>
               <p className="text-xs text-slate-500 font-medium max-w-[580px] mt-1 leading-relaxed">
                 Connect and log merchant operations. Click on any certified partner below to load their real-time performance diagnostics—including stock velocity, rating indexes, and active profit margins.
               </p>
@@ -414,7 +414,7 @@ export default function SellersPage() {
                           {seller.seller_id || 'PARTNER'}
                         </span>
                         {seller.is_verified && (
-                          <span className="text-blue-500" title="Bazer Verified Merchant">
+                          <span className="text-blue-500" title="pbazar Verified Merchant">
                             <ShieldCheck className="w-4 h-4 fill-blue-500 text-white" />
                           </span>
                         )}
@@ -431,7 +431,7 @@ export default function SellersPage() {
                       <h3 className="font-black text-slate-800 uppercase tracking-tight text-base mb-1 truncate w-full px-2 flex items-center justify-center gap-1">
                         <span>{seller.name}</span>
                         {seller.is_verified && (
-                          <ShieldCheck className="w-4 h-4 fill-blue-500 text-white flex-shrink-0" title="Bazer Verified Merchant" />
+                          <ShieldCheck className="w-4 h-4 fill-blue-500 text-white flex-shrink-0" title="pbazar Verified Merchant" />
                         )}
                       </h3>
                       <p className="text-[10px] text-slate-450 font-bold uppercase tracking-widest mb-4">Stock Value: {formatCurrency(m.products.reduce((acc, p) => acc + ((p.stock || 0) * p.price), 0))}</p>
@@ -522,7 +522,7 @@ export default function SellersPage() {
                                 <div className="text-xs font-black text-slate-800 uppercase tracking-tight flex items-center gap-1">
                                   <span>{seller.name}</span>
                                   {seller.is_verified && (
-                                    <ShieldCheck className="w-3.5 h-3.5 fill-blue-500 text-white flex-shrink-0" title="Bazer Verified Merchant" />
+                                    <ShieldCheck className="w-3.5 h-3.5 fill-blue-500 text-white flex-shrink-0" title="pbazar Verified Merchant" />
                                   )}
                                 </div>
                                 <div className="text-[9px] text-slate-400 font-bold uppercase mt-0.5">{seller.seller_id || seller.id.slice(0, 8)}</div>
@@ -784,7 +784,7 @@ export default function SellersPage() {
                       <h3 className="text-base font-black uppercase tracking-tight text-slate-800 flex items-center gap-1.5">
                         {selectedDashboardSeller.name}
                         {selectedDashboardSeller.is_verified && (
-                          <ShieldCheck className="w-4 h-4 fill-blue-500 text-white flex-shrink-0" title="Bazer Verified Merchant" />
+                          <ShieldCheck className="w-4 h-4 fill-blue-500 text-white flex-shrink-0" title="pbazar Verified Merchant" />
                         )}
                       </h3>
                       <span className="text-[8px] bg-indigo-100 text-indigo-700 border border-indigo-200/30 px-2 py-0.5 rounded font-black uppercase tracking-widest">

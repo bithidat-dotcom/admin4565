@@ -34,23 +34,27 @@ export default function Sidebar({ currentView, onViewChange, isOpen = false, onC
         "w-64 bg-white border-r border-slate-200 h-screen fixed top-0 flex flex-col z-50 transition-transform duration-300 ease-in-out md:translate-x-0 md:left-0",
         isOpen ? "translate-x-0 left-0" : "-translate-x-full md:translate-x-0"
       )}>
-        <div className="p-8 pb-6 border-b border-slate-100 flex items-center justify-between">
+        <div className="p-8 pb-6 border-b border-slate-100 flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <img src="https://i.postimg.cc/KvqR53hq/download-(1).png" alt="Logo" className="w-12 h-12 rounded-2xl object-contain bg-slate-50 p-1 border border-slate-100 shadow-sm" />
+            
+            <button
+              onClick={onClose}
+              className="md:hidden p-2 text-slate-400 hover:text-slate-900 hover:bg-slate-50 rounded-xl transition-all border border-slate-100"
+              title="Close Drawer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
           <div>
-            <h1 className="text-2xl font-black text-slate-900 tracking-tighter flex items-center gap-1">
-              BAZER<span className="text-brand">_BD</span>
+            <h1 className="text-2xl font-black text-slate-900 tracking-tighter flex items-center gap-1 leading-none">
+              p<span className="text-brand">bazar</span>
             </h1>
-            <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1 pr-1">
-              Admin Control v3.0
+            <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-2 pr-1">
+              Admin System v3.0
             </div>
           </div>
-          
-          <button
-            onClick={onClose}
-            className="md:hidden p-2 text-slate-400 hover:text-slate-900 hover:bg-slate-50 rounded-xl transition-all border border-slate-100"
-            title="Close Drawer"
-          >
-            <X className="w-4 h-4" />
-          </button>
         </div>
 
       <nav className="flex-1 p-4 space-y-4 mt-6 overflow-y-auto">

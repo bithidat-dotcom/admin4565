@@ -32,20 +32,21 @@ export default function OrderTableView({ orders, onStatusChange, statusUpdatingI
     }
 
     const doc = new jsPDF();
-    const qrData = `https://bazer-bd.vercel.app/order/${order.id}`; // Hypothetical storefront tracking link
+    const qrData = `https://pbazar-bd.com/product/${order.product_details || order.id}`; // Updated to pbazar domain
     
     // Add Logo
     try {
       const img = new Image();
-      // Using the user's provided logo URL from previous turns
-      img.src = 'https://i.postimg.cc/KvqR53hq/download-(1).png';
+      // Using pbazar logo URL
+      img.src = 'https://i.postimg.cc/KvqR53hq/download-(1).png'; 
       await new Promise((resolve) => { img.onload = resolve; });
-      doc.addImage(img, 'PNG', 12, 10, 40, 18);
+      doc.addImage(img, 'PNG', 12, 8, 30, 25); // Adjusted for pbazar logo shape
     } catch (e) {
       console.error("Failed to load logo", e);
-      doc.setFontSize(22);
-      doc.setTextColor(30, 41, 59);
-      doc.text("BAZER_BD", 12, 22);
+      doc.setFontSize(24);
+      doc.setTextColor(249, 115, 22); // Orange brand color
+      doc.setFont('helvetica', 'bold');
+      doc.text("pbazar", 12, 22);
     }
 
     // QR Code for Tracking
@@ -54,14 +55,14 @@ export default function OrderTableView({ orders, onStatusChange, statusUpdatingI
       doc.addImage(qrDataUrl, 'PNG', 165, 10, 30, 30);
       doc.setFontSize(7);
       doc.setTextColor(100, 116, 139);
-      doc.text("SCAN TO TRACK", 170, 42);
+      doc.text("SCAN FOR PRODUCT", 168, 42); // Clarified tracking purpose
     } catch (e) {
       console.error("Failed to generate QR code", e);
     }
 
     doc.setTextColor(30, 41, 59);
     doc.setFontSize(10);
-    doc.text(`Official Invoice & Shipping Label`, 60, 20);
+    doc.text(`Official Invoice & Product Info`, 60, 20);
     doc.setFontSize(8);
     doc.text(`Printed: ${format(new Date(), 'PPpp')}`, 60, 25);
     
@@ -83,11 +84,17 @@ export default function OrderTableView({ orders, onStatusChange, statusUpdatingI
 
     // Order Meta Info
     doc.setFont('helvetica', 'bold');
-    doc.text("ORDER INFO:", 110, 55);
+    doc.text("ORDER & SELLER:", 110, 55);
     doc.setFont('helvetica', 'normal');
     doc.text(`Ref ID: #${order.id.slice(0, 8).toUpperCase()}`, 110, 62);
     doc.text(`Date: ${order.created_at ? format(new Date(order.created_at), 'PPP') : 'N/A'}`, 110, 68);
-    doc.text(`Seller: ${order.seller || 'BAZER_BD Official'}`, 110, 74);
+    
+    // Highlighted Seller Name
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(249, 115, 22); // Brand color for seller
+    doc.text(`Seller: ${order.seller || 'pbazar Official'}`, 110, 74);
+    doc.setTextColor(30, 41, 59);
+    doc.setFont('helvetica', 'normal');
     
     // Status Badge
     doc.setFillColor(248, 250, 252);
@@ -98,16 +105,16 @@ export default function OrderTableView({ orders, onStatusChange, statusUpdatingI
 
     // Items Table
     doc.setFontSize(11);
-    doc.text("ORDER ITEMS", 12, 105);
+    doc.text("PRODUCT INFORMATION", 12, 105);
     
     autoTable(doc, {
       startY: 110,
-      head: [['SL', 'Item Description', 'Seller', 'Qty', 'Unit Price', 'Total']],
+      head: [['SL', 'Product Description', 'Seller Name', 'Qty', 'Unit Price', 'Total']],
       body: [
         [
           '1',
           order.product_name || 'Generic Item',
-          order.seller || 'N/A',
+          order.seller || 'pbazar Official',
           order.quantity || 1,
           formatCurrency(order.price),
           formatCurrency((Number(order.quantity) || 1) * order.price)
@@ -137,8 +144,8 @@ export default function OrderTableView({ orders, onStatusChange, statusUpdatingI
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(148, 163, 184);
-    doc.text("Note: This document serves as a parcel attachment for shipping.", 12, finalY + 40);
-    doc.text("Verify the seal and contents upon arrival.", 12, finalY + 45);
+    doc.text("Note: This document serves as a parcel attachment for product verification.", 12, finalY + 40);
+    doc.text("Verify the seal and seller information upon arrival.", 12, finalY + 45);
 
     // Signature Area
     doc.setTextColor(30, 41, 59);
@@ -146,10 +153,11 @@ export default function OrderTableView({ orders, onStatusChange, statusUpdatingI
     doc.text('Receiver\'s Signature:', 12, 260);
     doc.line(12, 270, 70, 270);
     
-    doc.text('Authorized Signature:', 130, 260);
+    doc.text('Authorized pbazar Delegate:', 130, 260); // Updated name
     doc.line(130, 270, 190, 270);
 
-    doc.save(`BAZER_INVOICE_${order.id.slice(0, 8)}.pdf`);
+    doc.save(`pbazar_INVOICE_${order.id.slice(0, 8)}.pdf`); // Updated filename
+
   };
 
   return (

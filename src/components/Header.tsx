@@ -24,7 +24,7 @@ export default function Header({ title, onAction, actionLabel }: HeaderProps) {
           <Menu className="w-5 h-5" />
         </button>
 
-        <img src="https://i.pinimg.com/1200x/2e/d3/45/2ed34552d98817c21168d0fbeb67bcc0.jpg" alt="Logo" className="w-8 h-8 rounded-full hidden sm:block" />
+        <img src="https://i.postimg.cc/KvqR53hq/download-(1).png" alt="Logo" className="w-8 h-8 rounded-full hidden sm:block object-contain" />
         <h2 className="text-xs md:text-sm font-black text-slate-900 uppercase tracking-[0.2em] truncate pr-2 max-w-[124px] sm:max-w-none">{title}</h2>
         
         <div className="flex items-center gap-2 md:gap-3 bg-slate-50 border border-slate-200/60 px-3 md:px-4 py-2 md:py-2.5 rounded-xl w-full max-w-[180px] sm:max-w-xs group focus-within:ring-4 focus-within:ring-brand/5 focus-within:border-brand/30 transition-all duration-300">

@@ -392,7 +392,7 @@ export default function OrdersPage() {
                                       </div>
                                     )}
                                     <span className="font-black text-slate-700 uppercase tracking-tight text-sm">
-                                      {order.seller || 'Bazer BD Admin'}
+                                      {order.seller || 'pbazar Official'}
                                     </span>
                                   </div>
                                 </div>
