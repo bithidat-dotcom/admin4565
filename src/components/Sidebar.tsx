@@ -1,24 +1,29 @@
 import React from 'react';
-import { LayoutDashboard, ShoppingBag, ShoppingCart, Image as ImageIcon, ChevronRight, Star, Users, X, Link as LinkIcon, Store, Settings } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, ShoppingCart, Image as ImageIcon, ChevronRight, Star, Users, X, Link as LinkIcon, Store, Settings, LogOut } from 'lucide-react';
 import { View } from '../types';
 import { cn } from '../lib/utils';
+import { UserSession } from '../App';
 
 interface SidebarProps {
   currentView: View;
   onViewChange: (view: View) => void;
   isOpen?: boolean;
   onClose?: () => void;
+  onLogout: () => void;
+  userSession: UserSession | null;
 }
 
-export default function Sidebar({ currentView, onViewChange, isOpen = false, onClose = () => {} }: SidebarProps) {
+export default function Sidebar({ currentView, onViewChange, isOpen = false, onClose = () => {}, onLogout, userSession }: SidebarProps) {
+  const isSeller = userSession?.role === 'seller';
+
   const menuItems = [
-    { id: 'dashboard' as View, icon: LayoutDashboard, label: 'Dashboard' },
-    { id: 'products' as View, icon: ShoppingBag, label: 'Products' },
-    { id: 'orders' as View, icon: ShoppingCart, label: 'Orders' },
-    { id: 'banners' as View, icon: ImageIcon, label: 'Banners' },
-    { id: 'reviews' as View, icon: Star, label: 'Reviews' },
-    { id: 'sellers' as View, icon: Store, label: 'Sellers' },
-  ];
+    { id: 'dashboard' as View, icon: LayoutDashboard, label: 'Dashboard', adminOnly: true },
+    { id: 'products' as View, icon: ShoppingBag, label: 'Products', adminOnly: false },
+    { id: 'orders' as View, icon: ShoppingCart, label: 'Orders', adminOnly: false },
+    { id: 'banners' as View, icon: ImageIcon, label: 'Banners', adminOnly: true },
+    { id: 'reviews' as View, icon: Star, label: 'Reviews', adminOnly: true },
+    { id: 'sellers' as View, icon: Store, label: 'Sellers', adminOnly: true },
+  ].filter(item => !isSeller || !item.adminOnly);
 
   return (
     <>
@@ -52,7 +57,7 @@ export default function Sidebar({ currentView, onViewChange, isOpen = false, onC
               p<span className="text-brand">bazar</span>
             </h1>
             <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-2 pr-1">
-              Admin System v3.0
+              PartNet v3.0 • {userSession?.role?.toUpperCase()}
             </div>
           </div>
         </div>
@@ -67,17 +72,18 @@ export default function Sidebar({ currentView, onViewChange, isOpen = false, onC
             }}
             title={item.label}
             className={cn(
-              "w-full flex items-center justify-center p-4 rounded-2xl transition-all duration-300 group cursor-pointer",
+              "w-full flex items-center justify-start gap-4 p-4 rounded-2xl transition-all duration-300 group cursor-pointer relative",
               currentView === item.id
                 ? "bg-slate-900 text-white shadow-lg"
                 : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"
             )}
           >
             <item.icon className={cn(
-              "w-7 h-7",
-              currentView === item.id ? "text-white" : "text-slate-400 group-hover:text-slate-600"
+              "w-6 h-6",
+              currentView === item.id ? "text-brand" : "text-slate-400 group-hover:text-slate-600"
             )} />
-            {item.id === 'orders' && (
+            <span className="text-sm font-black uppercase tracking-tight">{item.label}</span>
+            {item.id === 'orders' && !isSeller && (
               <span className={cn(
                 "absolute top-3 right-3 w-2.5 h-2.5 rounded-full",
                 currentView === item.id ? "bg-white" : "bg-red-500"
@@ -101,22 +107,32 @@ export default function Sidebar({ currentView, onViewChange, isOpen = false, onC
             <LinkIcon className="w-4 h-4 text-slate-400 group-hover:text-brand animate-pulse" />
             Link Converter
           </div>
-          <span className="text-[8px] px-1.5 py-0.5 rounded-md font-black uppercase tracking-tighter bg-indigo-55 text-indigo-600 border border-indigo-150">
-            Tool
-          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={onLogout}
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-black uppercase tracking-widest text-rose-500 hover:bg-rose-50 transition-all duration-300 group cursor-pointer mt-4"
+        >
+          <LogOut className="w-4 h-4" />
+          Logout System
         </button>
       </nav>
 
       <div className="p-6 border-t border-slate-100 bg-slate-50/50">
         <div className="flex items-center gap-3 p-3 bg-white rounded-2xl border border-slate-200/60 shadow-sm">
           <div className="w-9 h-9 rounded-xl bg-slate-900 flex items-center justify-center text-white font-black text-xs">
-            BD
+            {userSession?.role === 'admin' ? 'BA' : userSession?.name?.slice(0, 2).toUpperCase()}
           </div>
           <div className="flex flex-col overflow-hidden">
-            <span className="text-[11px] font-black text-slate-900 uppercase truncate">SuperAdmin</span>
+            <span className="text-[11px] font-black text-slate-900 uppercase truncate">
+              {userSession?.role === 'admin' ? 'pbazar Admin' : userSession?.name}
+            </span>
             <div className="flex items-center gap-1.5">
                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-               <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Active Now</span>
+               <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest leading-none">
+                 {userSession?.role === 'admin' ? 'Root Access' : `ID: ${userSession?.sellerId}`}
+               </span>
             </div>
           </div>
         </div>

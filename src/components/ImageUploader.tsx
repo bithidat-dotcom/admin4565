@@ -94,12 +94,18 @@ export default function ImageUploader({ value, onChange, folder, className }: Im
       )}
 
       {value && (
-        <div className="relative w-full h-40 rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
-          <img src={value} alt="Preview" className="w-full h-full object-cover" />
+        <div className="relative w-full h-44 rounded-2xl overflow-hidden border border-slate-200 bg-slate-100/50 shadow-inner group">
+          <img 
+            src={value} 
+            alt="Preview" 
+            referrerPolicy="no-referrer"
+            className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105" 
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/20 to-transparent pointer-events-none" />
           <button
             type="button"
             onClick={() => onChange('')}
-            className="absolute top-2 right-2 p-1 bg-white/80 backdrop-blur-sm rounded-full text-slate-500 hover:text-red-500 shadow-sm cursor-pointer"
+            className="absolute top-3 right-3 p-2 bg-white/90 backdrop-blur-md rounded-full text-slate-500 hover:text-rose-500 shadow-lg hover:shadow-rose-100 transition-all cursor-pointer z-10"
           >
             <X className="w-4 h-4" />
           </button>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc, Timestamp, writeBatch, getDocs, serverTimestamp } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc, Timestamp, writeBatch, getDocs, serverTimestamp, limit } from 'firebase/firestore';
 import { Product, Seller } from '../types';
 import Header from '../components/Header';
 import Modal from '../components/Modal';
@@ -40,6 +40,7 @@ interface ProductsPageProps {
   defaultCategory?: string;
   onCategoryFilterChange?: (category: string) => void;
   onViewChange?: (view: any) => void;
+  userSession?: any;
 }
 
 const categoryFilters = [
@@ -108,10 +109,14 @@ function DiscountTimer({ expiresAt }: { expiresAt: string }) {
   );
 }
 
-export default function ProductsPage({ defaultCategory = 'All', onCategoryFilterChange, onViewChange }: ProductsPageProps = {}) {
+export default function ProductsPage({ defaultCategory = 'All', onCategoryFilterChange, onViewChange, userSession }: ProductsPageProps = {}) {
   const [products, setProducts] = useState<Product[]>([]);
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  const isSeller = userSession?.role === 'seller';
+  const currentSellerName = userSession?.name || '';
+  const currentSellerId = userSession?.sellerId || '';
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -145,7 +150,9 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
       amp: ''
     },
     discountExpiresAt: '',
-    discountType: 'permanent' as 'permanent' | 'timer'
+    discountType: 'permanent' as 'permanent' | 'timer',
+    seller_id: '',
+    is_seller_creation: isSeller
   });
 
   const [newImageUrl, setNewImageUrl] = useState('');
@@ -168,7 +175,8 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
   );
 
   useEffect(() => {
-    const q = query(collection(db, 'products'), orderBy('created_at', 'desc'));
+    // Limited query to save quota
+    const q = query(collection(db, 'products'), orderBy('created_at', 'desc'), limit(500));
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const productsData = snapshot.docs.map(doc => ({
@@ -188,26 +196,33 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
   }, []);
 
   useEffect(() => {
-    const q = query(collection(db, 'sellers'), orderBy('name', 'asc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const sellersData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Seller[];
-      setSellers(sellersData);
-    });
-    return () => unsubscribe();
+    const fetchSellers = async () => {
+      try {
+        const q = query(collection(db, 'sellers'), orderBy('name', 'asc'));
+        const snapshot = await getDocs(q);
+        const sellersData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as Seller[];
+        setSellers(sellersData);
+      } catch (err) {
+         console.warn("Failed fetch of sellers in ProductsPage, might be quota issue:", err);
+      }
+    };
+    fetchSellers();
   }, []);
 
   const resetForm = () => {
     setFormData({
+      ...formData,
       name: '',
       price: '',
       description: '',
       image: '',
       images: [],
       discount: '0',
-      seller: '',
+      seller: isSeller ? currentSellerName : '',
+      seller_id: isSeller ? currentSellerId : '',
       seller_logo: '',
       seller_whatsapp: '',
       seller_email: '',
@@ -250,6 +265,7 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
       images: product.images || [],
       discount: product.discount.toString(),
       seller: product.seller || '',
+      seller_id: product.seller_id || '',
       seller_logo: product.seller_logo || '',
       seller_whatsapp: product.seller_whatsapp || '',
       seller_email: product.seller_email || '',
@@ -351,6 +367,7 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
       discount: parseFloat(formData.discount),
       description: formData.description,
       seller: formData.seller,
+      seller_id: formData.is_seller_creation ? currentSellerId : (formData.seller_id || ''),
       seller_logo: formData.seller_logo,
       seller_whatsapp: formData.seller_whatsapp,
       seller_email: formData.seller_email,
@@ -461,12 +478,14 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
       </div>
 
       <div className="px-4 md:px-8 mt-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
-        <button
-          onClick={handleOpenDeleteAllModal}
-          className="px-4 py-3 sm:py-2 bg-red-100 text-red-600 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-red-200 transition-colors shrink-0 text-center"
-        >
-          Delete All Products
-        </button>
+        {!isSeller && (
+          <button
+            onClick={handleOpenDeleteAllModal}
+            className="px-4 py-3 sm:py-2 bg-red-100 text-red-600 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-red-200 transition-colors shrink-0 text-center"
+          >
+            Delete All Products
+          </button>
+        )}
         <input 
           type="text" 
           placeholder="Filter by name..." 
@@ -547,31 +566,41 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
                       ? "opacity-100 pointer-events-auto" 
                       : "opacity-0 md:group-hover:opacity-100 pointer-events-none md:pointer-events-auto"
                   )}>
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleEdit(product);
-                      }}
-                      className="p-3 bg-white rounded-xl shadow-xl text-brand hover:scale-110 active:scale-95 transition-all"
-                      title="Edit Product"
-                    >
-                      <Edit2 className="w-5 h-5" />
-                    </button>
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDelete(product.id);
-                      }}
-                      disabled={deletingId === product.id}
-                      className="p-3 bg-white rounded-xl shadow-xl text-red-500 hover:scale-110 active:scale-95 transition-all disabled:opacity-50 disabled:scale-100"
-                      title="Delete Product"
-                    >
-                      {deletingId === product.id ? (
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                      ) : (
-                        <Trash2 className="w-5 h-5" />
-                      )}
-                    </button>
+                    {(!isSeller || product.seller_id === currentSellerId) && (
+                      <>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEdit(product);
+                          }}
+                          className="p-3 bg-white rounded-xl shadow-xl text-brand hover:scale-110 active:scale-95 transition-all"
+                          title="Edit Product"
+                        >
+                          <Edit2 className="w-5 h-5" />
+                        </button>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(product.id);
+                          }}
+                          disabled={deletingId === product.id}
+                          className="p-3 bg-white rounded-xl shadow-xl text-red-500 hover:scale-110 active:scale-95 transition-all disabled:opacity-50 disabled:scale-100"
+                          title="Delete Product"
+                        >
+                          {deletingId === product.id ? (
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-5 h-5" />
+                          )}
+                        </button>
+                      </>
+                    )}
+                    {(isSeller && product.seller_id !== currentSellerId) && (
+                      <div className="bg-white/10 p-4 rounded-2xl border border-white/20 backdrop-blur-md">
+                        <p className="text-[10px] font-black text-white uppercase tracking-widest text-center">Locked View</p>
+                        <p className="text-[8px] text-white/60 font-bold uppercase tracking-tight text-center">Owned by {product.seller}</p>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -851,7 +880,19 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
               />
             </div>
             <div className="space-y-3">
-              <div className="flex flex-col gap-3">
+              {isSeller ? (
+                <div className="p-4 bg-brand/5 border border-brand/20 rounded-2xl flex items-center gap-4">
+                  <div className="w-12 h-12 bg-slate-900 rounded-xl flex items-center justify-center text-white font-black text-xs">
+                    {(currentSellerName || 'S').slice(0, 2).toUpperCase()}
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Listing As Partner</p>
+                    <p className="text-sm font-black text-slate-900 uppercase">{currentSellerName || 'Independent Seller'}</p>
+                    <p className="text-[9px] font-bold text-brand uppercase tracking-tighter">Verified Identity • ID: {currentSellerId}</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3">
                 <div className="flex items-center justify-between">
                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Select Seller Profile</label>
                   <div className="flex gap-1">
@@ -890,9 +931,8 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
                     <ShoppingBasket className="w-4 h-4" />
                   </div>
                 </div>
-              </div>
 
-              <div className="flex gap-3 overflow-x-auto pb-4 snap-x -mx-1 px-1 scroll-smooth no-scrollbar md:scrollbar-thin scrollbar-thumb-slate-200">
+                <div className="flex gap-3 overflow-x-auto pb-4 snap-x -mx-1 px-1 scroll-smooth no-scrollbar md:scrollbar-thin scrollbar-thumb-slate-200">
                 <button
                   type="button"
                   onClick={() => setFormData({ 
@@ -959,8 +999,11 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
                   </button>
                 ))}
               </div>
-              
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-2">
+            </div>
+          )}
+
+          {!isSeller && (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-2">
                 <div className="space-y-1">
                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">WhatsApp Number</label>
                   <input
@@ -1022,6 +1065,7 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
                   />
                 </div>
               </div>
+              )}
             </div>
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Category</label>

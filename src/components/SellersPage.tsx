@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, getDocs, limit } from 'firebase/firestore';
 import { Seller, Product, Order, Review } from '../types';
 import Header from '../components/Header';
 import Modal from '../components/Modal';
@@ -63,8 +63,8 @@ export default function SellersPage() {
   });
 
   useEffect(() => {
-    // 1. Subscribe to Sellers
-    const qSellers = query(collection(db, 'sellers'), orderBy('created_at', 'desc'));
+    // 1. Subscribe to Sellers (Primary)
+    const qSellers = query(collection(db, 'sellers'), orderBy('created_at', 'desc'), limit(100));
     const unsubscribeSellers = onSnapshot(qSellers, (snapshot) => {
       const sellersData = snapshot.docs.map(doc => ({
         id: doc.id,
@@ -78,38 +78,26 @@ export default function SellersPage() {
       setLoading(false);
     });
 
-    // 2. Subscribe to Products
-    const unsubscribeProducts = onSnapshot(collection(db, 'products'), (snapshot) => {
-      const productsData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Product[];
-      setProducts(productsData);
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'products'));
+    // 2. Fetch dependencies once to save quota (Metrics calculation)
+    const fetchDependencies = async () => {
+      try {
+        const [productsSnap, ordersSnap, reviewsSnap] = await Promise.all([
+          getDocs(query(collection(db, 'products'), limit(500))),
+          getDocs(query(collection(db, 'orders'), orderBy('created_at', 'desc'), limit(500))),
+          getDocs(query(collection(db, 'reviews'), orderBy('date', 'desc'), limit(500)))
+        ]);
 
-    // 3. Subscribe to Orders
-    const unsubscribeOrders = onSnapshot(collection(db, 'orders'), (snapshot) => {
-      const ordersData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Order[];
-      setOrders(ordersData);
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'orders'));
-
-    // 4. Subscribe to Reviews
-    const unsubscribeReviews = onSnapshot(collection(db, 'reviews'), (snapshot) => {
-      const reviewsData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Review[];
-      setReviews(reviewsData);
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'reviews'));
+        setProducts(productsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[]);
+        setOrders(ordersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Order[]);
+        setReviews(reviewsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Review[]);
+      } catch (err) {
+        console.warn("Failed fetch of dependencies in SellersPage, might be quota issue:", err);
+      }
+    };
+    fetchDependencies();
 
     return () => {
       unsubscribeSellers();
-      unsubscribeProducts();
-      unsubscribeOrders();
-      unsubscribeReviews();
     };
   }, []);
 

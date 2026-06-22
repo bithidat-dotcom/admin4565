@@ -40,7 +40,7 @@ export default function OrderTableView({ orders, onStatusChange, statusUpdatingI
       // Using pbazar logo URL
       img.src = 'https://i.postimg.cc/KvqR53hq/download-(1).png'; 
       await new Promise((resolve) => { img.onload = resolve; });
-      doc.addImage(img, 'PNG', 12, 8, 30, 25); // Adjusted for pbazar logo shape
+      doc.addImage(img, 'PNG', 12, 8, 30, 15); // Refined dimensions for rectangular profile
     } catch (e) {
       console.error("Failed to load logo", e);
       doc.setFontSize(24);

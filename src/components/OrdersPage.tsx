@@ -13,9 +13,17 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Calendar } from 'lucide-react';
 import { decryptData, encryptData } from '../lib/security';
 
-export default function OrdersPage() {
+interface OrdersPageProps {
+  userSession?: any;
+}
+
+export default function OrdersPage({ userSession }: OrdersPageProps) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  const isSeller = userSession?.role === 'seller';
+  const currentSellerId = userSession?.sellerId || '';
+  const currentSellerName = userSession?.name || '';
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFilter, setDateFilter] = useState('');
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
@@ -36,7 +44,20 @@ export default function OrdersPage() {
   const [orderToDelete, setOrderToDelete] = useState<string | null>(null);
 
   useEffect(() => {
-    const q = query(collection(db, 'orders'), orderBy('created_at', 'desc'));
+    // 1. Listen to limited set of recent orders (quota saving)
+    let q;
+    if (isSeller) {
+      // If seller_id is not yet common in orders, we might need to filter by name for now, 
+      // but ideally use seller_id.
+      q = query(
+        collection(db, 'orders'), 
+        where('seller_id', '==', currentSellerId),
+        orderBy('created_at', 'desc'), 
+        limit(300)
+      );
+    } else {
+      q = query(collection(db, 'orders'), orderBy('created_at', 'desc'), limit(300));
+    }
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const ordersData = snapshot.docs.map(doc => {
@@ -59,17 +80,23 @@ export default function OrdersPage() {
       setLoading(false);
     });
 
-    const unsubscribeSellers = onSnapshot(collection(db, 'sellers'), (snapshot) => {
-      const sellersMap: Record<string, any> = {};
-      snapshot.docs.forEach(doc => {
-        sellersMap[doc.data().name] = { id: doc.id, ...doc.data() };
-      });
-      setSellers(sellersMap);
-    });
+    // 2. Fetch sellers once (they don't change often)
+    const fetchSellers = async () => {
+      try {
+        const snapshot = await getDocs(collection(db, 'sellers'));
+        const sellersMap: Record<string, any> = {};
+        snapshot.docs.forEach(doc => {
+          sellersMap[doc.data().name] = { id: doc.id, ...doc.data() };
+        });
+        setSellers(sellersMap);
+      } catch (err) {
+        console.warn("Failed to fetch sellers map, might be quota issue:", err);
+      }
+    };
+    fetchSellers();
 
     return () => {
       unsubscribe();
-      unsubscribeSellers();
     };
   }, []);
 

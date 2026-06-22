@@ -18,8 +18,9 @@ export enum OperationType {
   WRITE = 'write',
 }
 
-interface FirestoreErrorInfo {
+export interface FirestoreErrorInfo {
   error: string;
+  code?: string;
   operationType: OperationType;
   path: string | null;
   authInfo: {
@@ -35,9 +36,14 @@ interface FirestoreErrorInfo {
   }
 }
 
-export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+export function handleFirestoreError(error: any, operationType: OperationType, path: string | null) {
+  const isQuotaError = error?.code === 'resource-exhausted' || 
+                       error?.message?.includes('Quota limit exceeded') ||
+                       (typeof error === 'string' && error.includes('Quota limit exceeded'));
+
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
+    code: error?.code,
     authInfo: {
       userId: auth.currentUser?.uid,
       email: auth.currentUser?.email,
@@ -52,6 +58,13 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     operationType,
     path
   };
+
+  if (isQuotaError) {
+    console.warn('Firestore Quota Exceeded for path:', path, '. Graceful degradation active.');
+    // Return the error info instead of throwing to allow components to handle it
+    return errInfo;
+  }
+
   console.error('Firestore Error: ', JSON.stringify(errInfo));
   throw new Error(JSON.stringify(errInfo));
 }

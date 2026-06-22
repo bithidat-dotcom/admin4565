@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, onSnapshot, query, orderBy, deleteDoc, doc, where, updateDoc } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, deleteDoc, doc, where, updateDoc, limit } from 'firebase/firestore';
 import { User, Order, View } from '../types';
 import Header from '../components/Header';
 import Modal from '../components/Modal';
@@ -55,8 +55,8 @@ export default function UsersPage({ onViewChange }: UsersPageProps) {
   useEffect(() => {
     setLoading(true);
     
-    // Listen to registered users
-    const unsubUsers = onSnapshot(collection(db, 'users'), (usersSnap) => {
+    // 1. Listen to registered users (limited)
+    const unsubUsers = onSnapshot(query(collection(db, 'users'), limit(300)), (usersSnap) => {
       const usersList = usersSnap.docs
         .filter(doc => doc.data().is_hidden !== true)
         .map(doc => {
@@ -86,112 +86,91 @@ export default function UsersPage({ onViewChange }: UsersPageProps) {
           created_at: resolvedDate,
           isGuest: false
         };
-      });
-
-      // Listen to orders
-      const unsubOrders = onSnapshot(collection(db, 'orders'), (ordersSnap) => {
-        const ordersList = ordersSnap.docs.map(doc => {
-          const rawData = doc.data();
-          return {
-            id: doc.id,
-            ...rawData,
-            customer_name: decryptData(rawData.customer_name).trim(),
-            whatsapp_number: decryptData(rawData.whatsapp_number).trim(),
-            location: decryptData(rawData.location).trim(),
-            product_details: decryptData(rawData.product_details).trim(),
-            product_name: rawData.product_name || '',
-            created_at: rawData.created_at?.toDate?.()?.toISOString() || rawData.created_at || new Date().toISOString()
-          };
-        }) as Order[];
-
-        setOrders(ordersList);
-
-        // Process unified users list
-        const processedUsers: any[] = [...usersList];
-        
-        // Find orders by unique whatsapp numbers to see if we should:
-        // A) Correct registered user names/locations that are "Anonymous" or empty
-        // B) Create guest user entries for orders containing unregistered whatsapp numbers
-        const uniqueOrderWhatsapps = Array.from(new Set(ordersList.map(o => o.whatsapp_number).filter(Boolean)));
-
-        uniqueOrderWhatsapps.forEach(phone => {
-          const phoneOrders = ordersList.filter(o => o.whatsapp_number === phone);
-          const completedOrders = phoneOrders.filter(o => o.status === 'completed');
-          const totalSpent = completedOrders.reduce((sum, o) => sum + (Number(o.price) || 0), 0);
-          
-          // Get the most recent order to extract user details
-          const latestOrder = phoneOrders[0];
-          const latestName = latestOrder?.customer_name || '';
-          const latestLoc = latestOrder?.location || '';
-          const earliestDate = phoneOrders[phoneOrders.length - 1]?.created_at || new Date().toISOString();
-
-          // Find matching registered user
-          const matchingRegIdx = processedUsers.findIndex(u => u.whatsapp_number === phone);
-
-          if (matchingRegIdx !== -1) {
-            const regUser = processedUsers[matchingRegIdx];
-            if (!regUser.name || regUser.name === 'Anonymous User' || regUser.name === 'Anonymous' || regUser.name === '') {
-              regUser.name = latestName || 'Customer (' + phone.slice(-4) + ')';
-            }
-            if (!regUser.location || regUser.location === 'N/A' || regUser.location === '') {
-              regUser.location = latestLoc || 'N/A';
-            }
-            // Enhance registered user statistics with aggregated order stats
-            regUser.total_orders = phoneOrders.length;
-            regUser.total_spent = totalSpent;
-          } else {
-            // Synthesize a Guest User Profile
-            const guestName = latestName || 'Customer (' + phone.slice(-4) + ')';
-            processedUsers.push({
-              id: `guest-${phone.replace(/[^a-zA-Z0-9]/g, '') || Math.random().toString(36).substring(4)}`,
-              name: guestName,
-              whatsapp_number: phone,
-              location: latestLoc || 'N/A',
-              email: 'N/A',
-              total_orders: phoneOrders.length,
-              total_spent: totalSpent,
-              wallet_balance: Math.round(totalSpent * 0.10), // 10% cash back
-              created_at: earliestDate,
-              isGuest: true
-            });
-          }
-        });
-
-        // Final sanitation check to make absolutely sure no names are blank or Anonymous
-        const finalUsers = processedUsers.map(u => {
-          let cleanName = u.name;
-          if (!cleanName || cleanName === 'Anonymous User' || cleanName === 'Anonymous' || cleanName === 'N/A') {
-            const matchingOrder = ordersList.find(o => o.whatsapp_number === u.whatsapp_number);
-            cleanName = matchingOrder?.customer_name || 'Customer (' + (u.whatsapp_number || '').slice(-4) + ')';
-          }
-          return {
-            ...u,
-            name: cleanName
-          };
-        });
-
-        // Sort chronologically in memory (most recent created or order first)
-        finalUsers.sort((a, b) => {
-          const dateA = new Date(a.created_at || 0).getTime();
-          const dateB = new Date(b.created_at || 0).getTime();
-          return dateB - dateA;
-        });
-
-        setUsers(finalUsers);
-        setLoading(false);
-      }, (error) => {
-        handleFirestoreError(error, OperationType.LIST, 'orders');
-        setLoading(false);
-      });
-
-      return () => unsubOrders();
+      }) as User[];
+      setUsers(usersList);
+      setLoading(false);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'users');
       setLoading(false);
     });
 
-    return () => unsubUsers();
+    // 2. Listen to orders (limited)
+    const unsubOrders = onSnapshot(query(collection(db, 'orders'), limit(300), orderBy('created_at', 'desc')), (ordersSnap) => {
+      const ordersList = ordersSnap.docs.map(doc => {
+        const rawData = doc.data();
+        return {
+          id: doc.id,
+          ...rawData,
+          customer_name: decryptData(rawData.customer_name).trim(),
+          whatsapp_number: decryptData(rawData.whatsapp_number).trim(),
+          location: decryptData(rawData.location).trim(),
+          product_details: decryptData(rawData.product_details).trim(),
+          product_name: rawData.product_name || '',
+          created_at: rawData.created_at?.toDate?.()?.toISOString() || rawData.created_at || new Date().toISOString()
+        };
+      }) as Order[];
+      setOrders(ordersList);
+    });
+
+    return () => {
+      unsubUsers();
+      unsubOrders();
+    };
   }, []);
+
+  // Compute combined profile list whenever data changes (Optimized merged view)
+  const combinedUserProfiles = React.useMemo(() => {
+    const processedUsers: any[] = [...users];
+    const uniqueOrderWhatsapps = Array.from(new Set(orders.map(o => o.whatsapp_number).filter(Boolean)));
+
+    uniqueOrderWhatsapps.forEach(p => {
+      const phone = String(p || '');
+      const phoneOrders = orders.filter(o => o.whatsapp_number === phone);
+      const completedOrders = phoneOrders.filter(o => o.status === 'completed');
+      const totalSpent = completedOrders.reduce((sum, o) => sum + (Number(o.price) || 0), 0);
+      
+      const latestOrder = phoneOrders[0];
+      const latestName = latestOrder?.customer_name || '';
+      const latestLoc = latestOrder?.location || '';
+      const earliestDate = phoneOrders[phoneOrders.length - 1]?.created_at || new Date().toISOString();
+
+      const matchingRegIdx = processedUsers.findIndex(u => u.whatsapp_number === phone);
+
+      if (matchingRegIdx !== -1) {
+        const regUser = processedUsers[matchingRegIdx];
+        if (!regUser.name || regUser.name === 'Anonymous User' || regUser.name === 'Anonymous' || regUser.name === '') {
+          regUser.name = latestName || ('Customer (' + phone.slice(-4) + ')');
+        }
+        if (!regUser.location || regUser.location === 'N/A' || regUser.location === '') {
+          regUser.location = latestLoc || 'N/A';
+        }
+        regUser.total_orders = phoneOrders.length;
+        regUser.total_spent = totalSpent;
+      } else if (phone) {
+        processedUsers.push({
+          id: `guest-${phone.replace(/[^a-zA-Z0-9]/g, '') || Math.random().toString(36).substring(4)}`,
+          name: latestName || 'Customer (' + phone.slice(-4) + ')',
+          whatsapp_number: phone,
+          location: latestLoc || 'N/A',
+          email: 'N/A',
+          total_orders: phoneOrders.length,
+          total_spent: totalSpent,
+          wallet_balance: Math.round(totalSpent * 0.10),
+          created_at: earliestDate,
+          isGuest: true
+        });
+      }
+    });
+
+    return processedUsers.map(u => {
+      let cleanName = u.name;
+      if (!cleanName || cleanName === 'Anonymous User' || cleanName === 'Anonymous' || cleanName === 'N/A') {
+         const matchingOrder = orders.find(o => o.whatsapp_number === u.whatsapp_number);
+         cleanName = matchingOrder?.customer_name || 'Customer (' + (u.whatsapp_number || '').slice(-4) + ')';
+      }
+      return { ...u, name: cleanName };
+    }).sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+  }, [users, orders]);
 
   const confirmDeleteUser = async () => {
     if (!userToDelete) return;
@@ -251,7 +230,7 @@ export default function UsersPage({ onViewChange }: UsersPageProps) {
           </div>
         ) : (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            {users.map((user) => (
+            {combinedUserProfiles.map((user) => (
               <div 
                 key={user.id} 
                 className="bg-white rounded-2xl border border-slate-200 p-6 flex flex-col shadow-sm hover:shadow-md transition-all group relative"
@@ -454,7 +433,7 @@ export default function UsersPage({ onViewChange }: UsersPageProps) {
               </div>
             ))}
 
-            {users.length === 0 && (
+            {combinedUserProfiles.length === 0 && (
               <div className="col-span-full p-16 text-center text-slate-500 bg-slate-50/50 rounded-2xl border-2 border-dashed border-slate-200">
                 <Users className="w-16 h-16 mx-auto mb-4 opacity-20" />
                 <p className="text-lg font-black text-slate-900 uppercase tracking-tight">No Customers Found</p>

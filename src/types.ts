@@ -7,6 +7,7 @@ export interface Product {
   images: string[];
   discount: number;
   seller?: string;
+  seller_id?: string;
   seller_logo?: string;
   seller_whatsapp?: string;
   seller_email?: string;

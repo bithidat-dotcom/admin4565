@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, limit, getDocs, where } from 'firebase/firestore';
 import Header from '../components/Header';
 import LoadingDots from './LoadingDots';
 import { 
@@ -47,9 +47,14 @@ interface DashboardProps {
   onViewChange?: (view: any) => void;
   defaultCategory?: string;
   onCategoryFilterChange?: (category: string) => void;
+  userSession?: any;
 }
 
-export default function Dashboard({ onViewChange, defaultCategory = 'All', onCategoryFilterChange }: DashboardProps) {
+export default function Dashboard({ onViewChange, defaultCategory = 'All', onCategoryFilterChange, userSession }: DashboardProps) {
+  const isSeller = userSession?.role === 'seller';
+  const currentSellerId = userSession?.sellerId || '';
+  const currentSellerName = userSession?.name || '';
+
   const [stats, setStats] = useState({
     totalProducts: 0,
     totalOrders: 0,
@@ -76,8 +81,30 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
   }, []);
 
   useEffect(() => {
+    // Helper to get stats from cache
+    const cachedStats = localStorage.getItem('dashboard_stats_cache');
+    if (cachedStats) {
+      try {
+        setStats(JSON.parse(cachedStats));
+      } catch (e) {
+        console.error("Failed to parse cached stats", e);
+      }
+    }
+
     // Listen to orders for revenue, total count, and recent list
-    const qOrders = query(collection(db, 'orders'), orderBy('created_at', 'desc'));
+    // Use a limit to avoid fetching thousands of documents if they exist
+    let qOrders;
+    if (isSeller) {
+      qOrders = query(
+        collection(db, 'orders'), 
+        where('seller_id', '==', currentSellerId),
+        orderBy('created_at', 'desc'), 
+        limit(150)
+      );
+    } else {
+      qOrders = query(collection(db, 'orders'), orderBy('created_at', 'desc'), limit(150));
+    }
+
     const unsubscribeOrders = onSnapshot(qOrders, (snapshot) => {
       const allOrders = snapshot.docs.map(doc => ({ 
         id: doc.id, 
@@ -90,69 +117,69 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
       );
       const pending = allOrders.filter(o => o.status === 'pending').length;
 
-      setStats(prev => ({
-        ...prev,
-        totalOrders: allOrders.length,
-        totalRevenue: revenue,
-        pendingOrders: pending
-      }));
+      setStats(prev => {
+        const newStats = {
+          ...prev,
+          totalOrders: allOrders.length,
+          totalRevenue: revenue,
+          pendingOrders: pending
+        };
+        localStorage.setItem('dashboard_stats_cache', JSON.stringify(newStats));
+        return newStats;
+      });
       setOrders(allOrders);
       setRecentOrders(allOrders.slice(0, 5));
       setLoading(false);
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'orders'));
 
-    // Listen to products list and count
-    const unsubscribeProducts = onSnapshot(collection(db, 'products'), (snapshot) => {
-      const pList = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Product[];
+    // For products, banners, reviews, users, sellers:
+    // We only need counts on the dashboard. Let's do one-time fetches with 1 document limit just to get size info if possible?
+    // Actually Firestores snapshot.size doesn't care about limit for total count of the query.
+    
+    const productCol = collection(db, 'products');
+    const qProducts = isSeller ? query(productCol, where('seller_id', '==', currentSellerId)) : productCol;
+
+    const unsubscribeProducts = onSnapshot(qProducts, (snapshot) => {
+      const pList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[];
       setProductsList(pList);
-      setStats(prev => ({
-        ...prev,
-        totalProducts: snapshot.size
-      }));
+      setStats(prev => {
+        const updated = { ...prev, totalProducts: snapshot.size };
+        localStorage.setItem('dashboard_stats_cache', JSON.stringify(updated));
+        return updated;
+      });
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'products'));
 
-    // Listen to banners count
-    const unsubscribeBanners = onSnapshot(collection(db, 'banners'), (snapshot) => {
-      setStats(prev => ({
-        ...prev,
-        totalBanners: snapshot.size
-      }));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'banners'));
-
-    // Listen to reviews count
-    const unsubscribeReviews = onSnapshot(collection(db, 'reviews'), (snapshot) => {
-      setStats(prev => ({
-        ...prev,
-        totalReviews: snapshot.size
-      }));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'reviews'));
-
-    // Listen to users count
-    const unsubscribeUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
-      setStats(prev => ({
-        ...prev,
-        totalUsers: snapshot.size
-      }));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'users'));
-
-    // Listen to sellers count
-    const unsubscribeSellers = onSnapshot(collection(db, 'sellers'), (snapshot) => {
-      setStats(prev => ({
-        ...prev,
-        totalSellers: snapshot.size
-      }));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'sellers'));
+    // These don't need real-time updates for dashboard totals. One-time is enough to save quota.
+    const fetchCounts = async () => {
+      if (isSeller) return; // Sellers don't need global counts
+      try {
+        const [bannersSnap, reviewsSnap, usersSnap, sellersSnap] = await Promise.all([
+          getDocs(collection(db, 'banners')),
+          getDocs(collection(db, 'reviews')),
+          getDocs(collection(db, 'users')),
+          getDocs(collection(db, 'sellers'))
+        ]);
+        
+        setStats(prev => {
+          const updated = {
+            ...prev,
+            totalBanners: bannersSnap.size,
+            totalReviews: reviewsSnap.size,
+            totalUsers: usersSnap.size,
+            totalSellers: sellersSnap.size
+          };
+          localStorage.setItem('dashboard_stats_cache', JSON.stringify(updated));
+          return updated;
+        });
+      } catch (err) {
+        console.warn("Failed one-time fetch of counts, might be quota issue:", err);
+      }
+    };
+    fetchCounts();
 
     return () => {
       unsubscribeOrders();
       unsubscribeProducts();
-      unsubscribeBanners();
-      unsubscribeReviews();
-      unsubscribeUsers();
-      unsubscribeSellers();
     };
   }, []);
 
@@ -174,8 +201,8 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
     { label: 'DELIVERY REVENUE', value: formatCurrency(stats.totalRevenue), icon: TrendingUp, color: 'text-indigo-500', bg: 'bg-indigo-50/75 border border-indigo-100', change: 'Active & complete', changeColor: 'text-indigo-550' },
     { label: 'LIVE ORDERS', value: stats.totalOrders.toString(), icon: ShoppingCart, color: 'text-brand', bg: 'bg-indigo-50/70 border border-indigo-100', change: `${stats.pendingOrders} pending check`, changeColor: 'text-brand' },
     { label: 'PRODUCTS TOTAL', value: stats.totalProducts.toString(), icon: ShoppingBag, color: 'text-slate-700', bg: 'bg-slate-50 border border-slate-200/60', change: `${totalStock} in stock • ${totalSold} sold`, changeColor: 'text-slate-500' },
-    { label: 'SELLERS BASE', value: stats.totalSellers.toString(), icon: Users, color: 'text-purple-500', bg: 'bg-purple-50 border border-purple-100', change: `${stats.totalUsers} customers`, changeColor: 'text-purple-550' },
-  ];
+    !isSeller && { label: 'SELLERS BASE', value: stats.totalSellers.toString(), icon: Users, color: 'text-purple-500', bg: 'bg-purple-50 border border-purple-100', change: `${stats.totalUsers} customers`, changeColor: 'text-purple-550' },
+  ].filter(Boolean) as any[];
 
   const cancelledOrders = recentOrders.filter(o => o.status === 'cancelled').slice(0, 3);
 
@@ -578,6 +605,22 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
 
               {/* Sidebar Modules */}
               <div className="space-y-6">
+                {!isSeller && (
+                  <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm overflow-hidden flex flex-col group cursor-pointer hover:border-brand/40 transition-all" onClick={() => onViewChange?.('users')}>
+                    <div className="flex items-center justify-between mb-8">
+                      <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-500">
+                        <Users className="w-6 h-6" />
+                      </div>
+                      <ArrowRight className="w-5 h-5 text-slate-300 group-hover:text-brand group-hover:translate-x-1 transition-all" />
+                    </div>
+                    <h4 className="font-black text-slate-900 text-lg tracking-tight uppercase">User Directory</h4>
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1 mb-4">Registered customer base</p>
+                    <p className="text-[11px] font-medium text-slate-500 leading-relaxed">
+                      View and manage all registered customers who signed in from the frontend application.
+                    </p>
+                  </div>
+                )}
+
                 <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
                   <h3 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
                     <Trash2 className="w-4 h-4 text-red-500" />
@@ -613,19 +656,6 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
                   </div>
                 </div>
 
-                <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm overflow-hidden flex flex-col group cursor-pointer hover:border-brand/40 transition-all" onClick={() => onViewChange?.('users')}>
-                  <div className="flex items-center justify-between mb-8">
-                    <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-500">
-                      <Users className="w-6 h-6" />
-                    </div>
-                    <ArrowRight className="w-5 h-5 text-slate-300 group-hover:text-brand group-hover:translate-x-1 transition-all" />
-                  </div>
-                  <h4 className="font-black text-slate-900 text-lg tracking-tight uppercase">User Directory</h4>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1 mb-4">Registered customer base</p>
-                  <p className="text-[11px] font-medium text-slate-500 leading-relaxed">
-                    View and manage all registered customers who signed in from the frontend application.
-                  </p>
-                </div>
               </div>
             </div>
           </>

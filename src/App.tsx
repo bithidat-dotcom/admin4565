@@ -13,20 +13,30 @@ import PopupAd from './components/PopupAd';
 import { View } from './types';
 import { motion, AnimatePresence } from 'motion/react';
 import { db } from './lib/firebase';
-import { collection, onSnapshot, query, where, getDocs, updateDoc, doc } from 'firebase/firestore';                
+import { collection, onSnapshot, query, where, getDocs, updateDoc, doc, limit, orderBy } from 'firebase/firestore';                
+
+export interface UserSession {
+  role: 'admin' | 'seller';
+  name?: string;
+  sellerId?: string;
+}
 
 export default function App() {                
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [userSession, setUserSession] = useState<UserSession | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [filterCategory, setFilterCategory] = useState('All');
   const [isGlobalConverterOpen, setIsGlobalConverterOpen] = useState(false);
 
   useEffect(() => {
-    if (!isAuthenticated) return;
+    // Only run stock synchronization if admin is logged in (to prevent seller quota use/interception)
+    if (!isAuthenticated || userSession?.role !== 'admin') return;
     
     // Background listener to automatically adjust product stock in real-time when orders are placed or cancelled
-    const unsubscribe = onSnapshot(collection(db, 'orders'), async (snapshot) => {
+    // Limited to recent 50 orders to save quota and only handle active business flow
+    const qBackground = query(collection(db, 'orders'), orderBy('created_at', 'desc'), limit(50));
+    const unsubscribe = onSnapshot(qBackground, async (snapshot) => {
       for (const change of snapshot.docChanges()) {
         const orderId = change.doc.id;
         const orderData = change.doc.data();
@@ -117,8 +127,14 @@ export default function App() {
 
   useEffect(() => {
     const authStatus = localStorage.getItem('isAdminAuthenticated');
+    const sessionStr = localStorage.getItem('userSession');
     if (authStatus === 'true') {
       setIsAuthenticated(true);
+      if (sessionStr) {
+        setUserSession(JSON.parse(sessionStr));
+      } else {
+        setUserSession({ role: 'admin' });
+      }
     }
   }, []);
 
@@ -134,9 +150,18 @@ export default function App() {
     return () => window.removeEventListener('open-link-converter', handleOpenConverter);
   }, []);
 
-  const handleLogin = () => {
+  const handleLogin = (session: UserSession) => {
     setIsAuthenticated(true);
+    setUserSession(session);
     localStorage.setItem('isAdminAuthenticated', 'true');
+    localStorage.setItem('userSession', JSON.stringify(session));
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    setUserSession(null);
+    localStorage.removeItem('isAdminAuthenticated');
+    localStorage.removeItem('userSession');
   };
 
   if (!isAuthenticated) {
@@ -144,8 +169,32 @@ export default function App() {
   }
 
   const renderView = () => {
+    const isSeller = userSession?.role === 'seller';
+    
+    // Auto-redirect sellers to products if they try to access prohibited areas
+    if (isSeller && ['workers', 'banners', 'settings', 'users', 'reviews', 'sellers'].includes(currentView)) {
+      return (
+        <ProductsPage 
+            defaultCategory={filterCategory}
+            onCategoryFilterChange={setFilterCategory}
+            onViewChange={setCurrentView}
+            userSession={userSession}
+        />
+      );
+    }
+
     switch (currentView) {
       case 'dashboard':
+        if (isSeller) {
+          return (
+            <ProductsPage 
+              defaultCategory={filterCategory}
+              onCategoryFilterChange={setFilterCategory}
+              onViewChange={setCurrentView}
+              userSession={userSession}
+            />
+          );
+        }
         return (
           <Dashboard 
             onViewChange={setCurrentView} 
@@ -162,10 +211,11 @@ export default function App() {
             defaultCategory={filterCategory}
             onCategoryFilterChange={setFilterCategory}
             onViewChange={setCurrentView}
+            userSession={userSession}
           />
         );
       case 'orders':
-        return <OrdersPage />;
+        return <OrdersPage userSession={userSession} />;
       case 'banners':
         return <BannersPage />;
       case 'reviews':
@@ -187,6 +237,8 @@ export default function App() {
         onViewChange={setCurrentView} 
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
+        onLogout={handleLogout}
+        userSession={userSession}
       />
       
       <div className="md:pl-64 pl-0 min-h-screen flex flex-col">
