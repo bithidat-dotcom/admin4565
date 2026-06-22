@@ -70,6 +70,7 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
   const [productsList, setProductsList] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
+  const [isShowingGlobal, setIsShowingGlobal] = useState(false);
   const [boardNote, setBoardNote] = useState(() => localStorage.getItem('dashboard_define_note') || 'Welcome to the pbazar admin hub! Set daily target numbers, notice highlights, or custom operational parameters here.');
   const [isNoteEditing, setIsNoteEditing] = useState(false);
 
@@ -94,7 +95,7 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
     // Listen to orders for revenue, total count, and recent list
     // Use a limit to avoid fetching thousands of documents if they exist
     let qOrders;
-    if (isSeller) {
+    if (isSeller && !isShowingGlobal) {
       qOrders = query(
         collection(db, 'orders'), 
         where('seller_id', '==', currentSellerId),
@@ -137,7 +138,7 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
     // Actually Firestores snapshot.size doesn't care about limit for total count of the query.
     
     const productCol = collection(db, 'products');
-    const qProducts = isSeller ? query(productCol, where('seller_id', '==', currentSellerId)) : productCol;
+    const qProducts = (isSeller && !isShowingGlobal) ? query(productCol, where('seller_id', '==', currentSellerId)) : productCol;
 
     const unsubscribeProducts = onSnapshot(qProducts, (snapshot) => {
       const pList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[];
@@ -151,7 +152,7 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
 
     // These don't need real-time updates for dashboard totals. One-time is enough to save quota.
     const fetchCounts = async () => {
-      if (isSeller) return; // Sellers don't need global counts
+      if (isSeller && !isShowingGlobal) return; // Only fetch global counts if requested or admin
       try {
         const [bannersSnap, reviewsSnap, usersSnap, sellersSnap] = await Promise.all([
           getDocs(collection(db, 'banners')),
@@ -181,7 +182,7 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
       unsubscribeOrders();
       unsubscribeProducts();
     };
-  }, []);
+  }, [isShowingGlobal]);
 
   const totalStock = productsList.reduce((sum, p) => sum + (p.stock ?? 0), 0);
   const totalSold = productsList.reduce((sum, p) => sum + (p.sold ?? 0), 0);
@@ -241,19 +242,44 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
         ) : (
           <>
             {/* Logo Section */}
-            <div className="mb-6 flex items-center gap-6">
-              <div className="w-16 h-16 bg-white rounded-2xl border border-slate-200 shadow-sm flex items-center justify-center p-2 relative group overflow-hidden">
-                <img src="https://i.postimg.cc/KvqR53hq/download-(1).png" alt="pbazar" className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-110" />
-                <div className="absolute inset-0 bg-brand/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+              <div className="flex items-center gap-6">
+                <div className="w-16 h-16 bg-white rounded-2xl border border-slate-200 shadow-sm flex items-center justify-center p-2 relative group overflow-hidden">
+                  <img src="https://i.postimg.cc/KvqR53hq/download-(1).png" alt="pbazar" className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-110" />
+                  <div className="absolute inset-0 bg-brand/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter leading-none">
+                    pbazar <span className="text-brand">Admin Area</span>
+                  </h1>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-2">
+                    Official Commerce Hub • DHAKA, BD
+                  </p>
+                </div>
               </div>
-              <div>
-                <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter leading-none">
-                  pbazar <span className="text-brand">Admin Area</span>
-                </h1>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-2">
-                  Official Commerce Hub • DHAKA, BD
-                </p>
-              </div>
+
+              {isSeller && (
+                <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
+                  <button
+                    onClick={() => setIsShowingGlobal(false)}
+                    className={cn(
+                      "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                      !isShowingGlobal ? "bg-white text-brand shadow-sm" : "text-slate-400 hover:text-slate-600"
+                    )}
+                  >
+                    My Shop
+                  </button>
+                  <button
+                    onClick={() => setIsShowingGlobal(true)}
+                    className={cn(
+                      "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                      isShowingGlobal ? "bg-white text-indigo-600 shadow-sm" : "text-slate-400 hover:text-slate-600"
+                    )}
+                  >
+                    Global Market
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Stat Grid */}

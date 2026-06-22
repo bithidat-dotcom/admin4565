@@ -185,16 +185,6 @@ export default function App() {
 
     switch (currentView) {
       case 'dashboard':
-        if (isSeller) {
-          return (
-            <ProductsPage 
-              defaultCategory={filterCategory}
-              onCategoryFilterChange={setFilterCategory}
-              onViewChange={setCurrentView}
-              userSession={userSession}
-            />
-          );
-        }
         return (
           <Dashboard 
             onViewChange={setCurrentView} 
@@ -203,6 +193,7 @@ export default function App() {
               setFilterCategory(cat);
               setCurrentView('products');
             }}
+            userSession={userSession}
           />
         );
       case 'products':

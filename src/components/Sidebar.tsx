@@ -17,7 +17,7 @@ export default function Sidebar({ currentView, onViewChange, isOpen = false, onC
   const isSeller = userSession?.role === 'seller';
 
   const menuItems = [
-    { id: 'dashboard' as View, icon: LayoutDashboard, label: 'Dashboard', adminOnly: true },
+    { id: 'dashboard' as View, icon: LayoutDashboard, label: 'Dashboard', adminOnly: false },
     { id: 'products' as View, icon: ShoppingBag, label: 'Products', adminOnly: false },
     { id: 'orders' as View, icon: ShoppingCart, label: 'Orders', adminOnly: false },
     { id: 'banners' as View, icon: ImageIcon, label: 'Banners', adminOnly: true },
