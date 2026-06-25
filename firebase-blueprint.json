@@ -2,141 +2,64 @@
   "entities": {
     "Product": {
       "title": "Product",
-      "description": "A product for sale in the store",
+      "description": "An ecommerce product listing",
       "type": "object",
       "properties": {
-        "name": { "type": "string", "description": "Name of the product" },
-        "price": { "type": "number", "description": "Price of the product" },
-        "description": { "type": "string", "description": "Detailed description" },
-        "image": { "type": "string", "description": "Main thumbnail image URL" },
-        "images": { "type": "array", "items": { "type": "string" }, "description": "Gallery of product images" },
-        "discount": { "type": "number", "description": "Discount amount or percentage" },
-        "seller": { "type": "string", "description": "Name of the seller" },
-        "created_at": { "type": "string", "format": "date-time", "description": "Creation timestamp" }
+        "name": { "type": "string" },
+        "price": { "type": "number" },
+        "discount": { "type": "number" },
+        "category": { "type": "string" },
+        "image": { "type": "string" },
+        "description": { "type": "string" },
+        "stock": { "type": "number" },
+        "sold": { "type": "number" },
+        "seller": { "type": "string" },
+        "seller_id": { "type": "string" },
+        "is_super_sale": { "type": "boolean" },
+        "created_at": { "type": "string", "format": "date-time" }
       },
-      "required": ["name", "price", "description", "image"]
-    },
-    "Banner": {
-      "title": "Banner",
-      "description": "Promotional banner",
-      "type": "object",
-      "properties": {
-        "title": { "type": "string", "description": "Title of the banner" },
-        "image": { "type": "string", "description": "Image URL of the banner" }
-      },
-      "required": ["title", "image"]
+      "required": ["name", "price"]
     },
     "Order": {
       "title": "Order",
-      "description": "Shipment/Order record",
+      "description": "A customer order",
       "type": "object",
       "properties": {
-        "customer_name": { "type": "string", "description": "Name of the customer" },
-        "whatsapp_number": { "type": "string", "description": "WhatsApp contact number" },
-        "location": { "type": "string", "description": "Delivery location" },
-        "price": { "type": "number", "description": "Order total price" },
-        "product_details": { "type": "string", "description": "Details of the ordered products" },
-        "status": { "type": "string", "description": "Order status", "enum": ["pending", "processing", "shipped", "delivered", "cancelled"] },
+        "customer_name": { "type": "string" },
+        "whatsapp_number": { "type": "string" },
+        "location": { "type": "string" },
+        "price": { "type": "number" },
+        "status": { "type": "string" },
+        "seller": { "type": "string" },
+        "seller_id": { "type": "string" },
         "created_at": { "type": "string", "format": "date-time" }
-      },
-      "required": ["customer_name", "price", "status"]
-    },
-    "Review": {
-      "title": "Review",
-      "description": "Customer product review",
-      "type": "object",
-      "properties": {
-        "customer_name": { "type": "string", "description": "Name of the reviewer" },
-        "rating": { "type": "number", "minimum": 1, "maximum": 5, "description": "Rating out of 5" },
-        "comment": { "type": "string", "description": "Review text" },
-        "product_name": { "type": "string", "description": "Name of the product being reviewed" },
-        "created_at": { "type": "string", "format": "date-time" }
-      },
-      "required": ["customer_name", "rating", "comment"]
-    },
-    "User": {
-      "title": "User",
-      "description": "Customer profile details",
-      "type": "object",
-      "properties": {
-        "name": { "type": "string", "description": "Full name" },
-        "whatsapp_number": { "type": "string", "description": "WhatsApp contact" },
-        "location": { "type": "string", "description": "Primary delivery address" },
-        "email": { "type": "string", "description": "Email address" },
-        "total_orders": { "type": "number", "default": 0 },
-        "last_login": { "type": "string", "format": "date-time" },
-        "created_at": { "type": "string", "format": "date-time" }
-      },
-      "required": ["name", "whatsapp_number"]
-    },
-    "Chat": {
-      "title": "Chat",
-      "description": "A conversation between a user and admin",
-      "type": "object",
-      "properties": {
-        "user_id": { "type": "string" },
-        "user_name": { "type": "string" },
-        "last_message": { "type": "string" },
-        "unread_count": { "type": "number", "default": 0 },
-        "updated_at": { "type": "string", "format": "date-time" }
-      },
-      "required": ["user_id", "user_name"]
-    },
-    "Message": {
-      "title": "Message",
-      "description": "An individual chat message",
-      "type": "object",
-      "properties": {
-        "text": { "type": "string" },
-        "sender": { "type": "string", "enum": ["user", "admin"] },
-        "created_at": { "type": "string", "format": "date-time" }
-      },
-      "required": ["text", "sender"]
-    },
-    "CouponSettings": {
-      "title": "CouponSettings",
-      "description": "Global coupon toggle and configuration",
-      "type": "object",
-      "properties": {
-        "isActive": { "type": "boolean", "description": "Global activation for coupons" },
-        "minPurchase": { "type": "number", "description": "Min purchase for eligibility" },
-        "discountAmount": { "type": "number", "description": "Discount amount" }
-      },
-      "required": ["isActive", "minPurchase", "discountAmount"]
+      }
     }
   },
   "firestore": {
-    "/products": {
+    "products": {
       "schema": "Product",
       "description": "Store products"
     },
-    "/banners": {
-      "schema": "Banner",
-      "description": "Store promotional banners"
-    },
-    "/orders": {
+    "orders": {
       "schema": "Order",
-      "description": "Store customer orders"
+      "description": "Store orders"
     },
-    "/reviews": {
-      "schema": "Review",
+    "banners": {
+      "schema": { "type": "object", "properties": {} },
+      "description": "App banners"
+    },
+    "reviews": {
+      "schema": { "type": "object", "properties": {} },
       "description": "Product reviews"
     },
-    "/users": {
-      "schema": "User",
-      "description": "Registered customers"
+    "users": {
+      "schema": { "type": "object", "properties": {} },
+      "description": "App users"
     },
-    "/chats": {
-      "schema": "Chat",
-      "description": "Conversation list"
-    },
-    "/chats/{chatId}/messages": {
-      "schema": "Message",
-      "description": "Messages within a conversation"
-    },
-    "/settings/coupon": {
-      "schema": "CouponSettings",
-      "description": "Global coupon configuration"
+    "sellers": {
+      "schema": { "type": "object", "properties": {} },
+      "description": "Seller profiles"
     }
   }
 }

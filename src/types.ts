@@ -29,6 +29,7 @@ export interface Product {
     amp?: string;
   };
   discountExpiresAt?: string;
+  is_super_sale?: boolean;
 }
 
 export interface Order {

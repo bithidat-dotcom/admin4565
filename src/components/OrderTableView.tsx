@@ -40,10 +40,10 @@ export default function OrderTableView({ orders, onStatusChange, statusUpdatingI
       // Using pbazar logo URL
       img.src = 'https://i.postimg.cc/KvqR53hq/download-(1).png'; 
       await new Promise((resolve) => { img.onload = resolve; });
-      doc.addImage(img, 'PNG', 12, 8, 30, 15); // Refined dimensions for rectangular profile
+      doc.addImage(img, 'PNG', 12, 8, 22, 22); // Fixed for square-ish brand logo stack
     } catch (e) {
       console.error("Failed to load logo", e);
-      doc.setFontSize(24);
+      doc.setFontSize(22);
       doc.setTextColor(249, 115, 22); // Orange brand color
       doc.setFont('helvetica', 'bold');
       doc.text("pbazar", 12, 22);
@@ -55,16 +55,19 @@ export default function OrderTableView({ orders, onStatusChange, statusUpdatingI
       doc.addImage(qrDataUrl, 'PNG', 165, 10, 30, 30);
       doc.setFontSize(7);
       doc.setTextColor(100, 116, 139);
-      doc.text("SCAN FOR PRODUCT", 168, 42); // Clarified tracking purpose
+      doc.text("SCAN TO VERIFY", 168, 42); 
     } catch (e) {
       console.error("Failed to generate QR code", e);
     }
 
     doc.setTextColor(30, 41, 59);
-    doc.setFontSize(10);
-    doc.text(`Official Invoice & Product Info`, 60, 20);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`OFFICIAL INVOICE`, 45, 20);
     doc.setFontSize(8);
-    doc.text(`Printed: ${format(new Date(), 'PPpp')}`, 60, 25);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Processed by pbazar Logistics BD`, 45, 25);
+    doc.text(`Printed: ${format(new Date(), 'PPpp')}`, 45, 30);
     
     doc.setDrawColor(226, 232, 240);
     doc.line(10, 45, 200, 45);
@@ -72,27 +75,29 @@ export default function OrderTableView({ orders, onStatusChange, statusUpdatingI
     // Shipping & Customer Info Section
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
-    doc.text("SHIP TO:", 12, 55);
+    doc.text("SHIP TO / BUYER INFO:", 12, 55);
     doc.setFont('helvetica', 'normal');
     doc.text(order.customer_name.toUpperCase(), 12, 62);
     doc.setFontSize(9);
-    doc.text(`Contact: ${order.whatsapp_number}`, 12, 68);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`BUYER MOBILE: ${order.whatsapp_number}`, 12, 68);
+    doc.setFont('helvetica', 'normal');
     
     // Multi-line address handling
-    const splitAddress = doc.splitTextToSize(order.location, 80);
+    const splitAddress = doc.splitTextToSize(`Address: ${order.location}`, 80);
     doc.text(splitAddress, 12, 74);
 
     // Order Meta Info
     doc.setFont('helvetica', 'bold');
-    doc.text("ORDER & SELLER:", 110, 55);
+    doc.text("ORDER & SELLER DETAILS:", 110, 55);
     doc.setFont('helvetica', 'normal');
     doc.text(`Ref ID: #${order.id.slice(0, 8).toUpperCase()}`, 110, 62);
     doc.text(`Date: ${order.created_at ? format(new Date(order.created_at), 'PPP') : 'N/A'}`, 110, 68);
     
     // Highlighted Seller Name
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(249, 115, 22); // Brand color for seller
-    doc.text(`Seller: ${order.seller || 'pbazar Official'}`, 110, 74);
+    doc.setTextColor(249, 115, 22); // pbazar orange
+    doc.text(`SELLER: ${order.seller || 'pbazar Official'}`, 110, 74);
     doc.setTextColor(30, 41, 59);
     doc.setFont('helvetica', 'normal');
     
@@ -101,15 +106,15 @@ export default function OrderTableView({ orders, onStatusChange, statusUpdatingI
     doc.roundedRect(110, 78, 60, 10, 2, 2, 'F');
     doc.setFontSize(8);
     doc.setFont('helvetica', 'bold');
-    doc.text(`STATUS: ${order.status.toUpperCase()}`, 115, 84);
+    doc.text(`ORDER STATUS: ${order.status.toUpperCase()}`, 115, 84);
 
     // Items Table
     doc.setFontSize(11);
-    doc.text("PRODUCT INFORMATION", 12, 105);
+    doc.text("PRODUCT SUMMARY", 12, 105);
     
     autoTable(doc, {
       startY: 110,
-      head: [['SL', 'Product Description', 'Seller Name', 'Qty', 'Unit Price', 'Total']],
+      head: [['SL', 'Product Name', 'Seller Name', 'Qty', 'Unit Price', 'Item Total']],
       body: [
         [
           '1',
@@ -129,16 +134,24 @@ export default function OrderTableView({ orders, onStatusChange, statusUpdatingI
 
     // Summary Box
     const finalY = (doc as any).lastAutoTable.finalY + 10;
+    doc.setDrawColor(241, 245, 249);
+    doc.setFillColor(248, 250, 252);
+    doc.rect(130, finalY - 5, 70, 35, 'F');
     doc.setDrawColor(30, 41, 59);
-    doc.setLineWidth(0.5);
-    doc.line(130, finalY, 200, finalY);
+    doc.line(130, finalY - 5, 200, finalY - 5);
+    
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text("Sub-total:", 135, finalY + 5);
+    doc.text(formatCurrency((Number(order.quantity) || 1) * order.price), 195, finalY + 5, { align: 'right' });
+    
+    doc.text("Discount:", 135, finalY + 12);
+    doc.text(formatCurrency(0), 195, finalY + 12, { align: 'right' });
+
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
-    doc.text("SUBTOTAL:", 130, finalY + 10);
-    doc.text(formatCurrency((Number(order.quantity) || 1) * order.price), 200, finalY + 10, { align: 'right' });
-    
-    doc.text("GRAND TOTAL:", 130, finalY + 20);
-    doc.text(formatCurrency((Number(order.quantity) || 1) * order.price), 200, finalY + 20, { align: 'right' });
+    doc.text("TOTAL PAYABLE:", 135, finalY + 22);
+    doc.text(formatCurrency((Number(order.quantity) || 1) * order.price), 195, finalY + 22, { align: 'right' });
 
     // Parcel Footer / Attachment Clause
     doc.setFont('helvetica', 'normal');

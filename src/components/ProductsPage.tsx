@@ -45,6 +45,7 @@ interface ProductsPageProps {
 
 const categoryFilters = [
   { name: 'All', icon: Boxes },
+  { name: 'Super Sale', icon: Star, special: 'super_sale' },
   { name: 'Food', icon: Pizza },
   { name: 'Fashion', icon: Crown },
   { name: 'Gadget', icon: Smartphone },
@@ -152,6 +153,7 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
     discountExpiresAt: '',
     discountType: 'permanent' as 'permanent' | 'timer',
     seller_id: '',
+    is_super_sale: false,
     is_seller_creation: isSeller
   });
 
@@ -169,10 +171,17 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
     onCategoryFilterChange?.(filterCategory);
   }, [filterCategory, onCategoryFilterChange]);
 
-  const filteredProducts = products.filter(product => 
-    product.name.toLowerCase().includes(filterName.toLowerCase()) &&
-    (filterCategory === 'All' || product.category === filterCategory)
-  );
+  const filteredProducts = products.filter(product => {
+    const matchesSearch = product.name.toLowerCase().includes(filterName.toLowerCase());
+    const matchesCategory = filterCategory === 'All' || product.category === filterCategory;
+    const matchesSuperSell = filterCategory === 'Super Sale' ? product.is_super_sale : true;
+    
+    if (filterCategory === 'Super Sale') {
+      return matchesSearch && product.is_super_sale;
+    }
+    
+    return matchesSearch && matchesCategory;
+  });
 
   useEffect(() => {
     // Limited query to save quota
@@ -241,7 +250,8 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
         amp: ''
       },
       discountExpiresAt: '',
-      discountType: 'permanent'
+      discountType: 'permanent',
+      is_super_sale: false
     });
     setEditingProduct(null);
     setNewImageUrl('');
@@ -284,7 +294,8 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
         amp: product.gadgetSpecs?.amp || ''
       },
       discountExpiresAt: product.discountExpiresAt || '',
-      discountType: product.discountExpiresAt ? 'timer' : 'permanent'
+      discountType: product.discountExpiresAt ? 'timer' : 'permanent',
+      is_super_sale: product.is_super_sale || false
     });
     setIsModalOpen(true);
   };
@@ -388,6 +399,7 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
         watt: formData.gadgetSpecs.watt || '',
         amp: formData.gadgetSpecs.amp || ''
       } : null,
+      is_super_sale: formData.is_super_sale,
       discountExpiresAt: (parseFloat(formData.discount) > 0 && formData.discountType === 'timer') ? formData.discountExpiresAt : ''
     };
 
@@ -520,7 +532,10 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
               <div 
                 key={product.id} 
                 onClick={() => setActiveProductId(prev => prev === product.id ? null : product.id)}
-                className="bg-white rounded-xl border border-slate-200 overflow-hidden group hover:shadow-lg transition-all duration-500 cursor-pointer"
+                className={cn(
+                  "bg-white rounded-xl border overflow-hidden group hover:shadow-xl transition-all duration-500 cursor-pointer relative",
+                  product.is_super_sale ? "border-amber-400 shadow-lg shadow-amber-50 ring-1 ring-amber-400/20" : "border-slate-200"
+                )}
               >
                 <div className="aspect-square relative overflow-hidden bg-slate-100">
                   {product.image ? (
@@ -538,6 +553,12 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
                   {product.discount > 0 && (
                     <div className="absolute top-3 left-3 bg-red-500 text-white text-[10px] font-black px-2 py-1 rounded tracking-tighter uppercase z-10">
                       -{product.discount}%
+                    </div>
+                  )}
+                  {product.is_super_sale && (
+                    <div className="absolute top-10 left-3 bg-amber-500 text-white text-[9px] font-black px-2 py-1 rounded tracking-widest uppercase z-10 flex items-center gap-1 shadow-lg shadow-amber-500/20">
+                      <Star className="w-2.5 h-2.5 fill-current" />
+                      Super Sale
                     </div>
                   )}
                   {product.seller && (
@@ -577,6 +598,25 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
                           title="Edit Product"
                         >
                           <Edit2 className="w-5 h-5" />
+                        </button>
+                        <button 
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            try {
+                              await updateDoc(doc(db, 'products', product.id), {
+                                is_super_sale: !product.is_super_sale
+                              });
+                            } catch (err) {
+                              handleFirestoreError(err, OperationType.UPDATE, `products/${product.id}`);
+                            }
+                          }}
+                          className={cn(
+                            "p-3 rounded-xl shadow-xl hover:scale-110 active:scale-95 transition-all",
+                            product.is_super_sale ? "bg-amber-500 text-white" : "bg-white text-slate-400"
+                          )}
+                          title={product.is_super_sale ? "Remove from Super Sale" : "Mark as Super Sale"}
+                        >
+                          <Star className="w-5 h-5" />
                         </button>
                         <button 
                           onClick={(e) => {
@@ -859,7 +899,7 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
             </div>
           </div>
           
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Price (৳)</label>
               <input
@@ -879,194 +919,6 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
                 className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all text-sm font-medium"
               />
             </div>
-            <div className="space-y-3">
-              {isSeller ? (
-                <div className="p-4 bg-brand/5 border border-brand/20 rounded-2xl flex items-center gap-4">
-                  <div className="w-12 h-12 bg-slate-900 rounded-xl flex items-center justify-center text-white font-black text-xs">
-                    {(currentSellerName || 'S').slice(0, 2).toUpperCase()}
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Listing As Partner</p>
-                    <p className="text-sm font-black text-slate-900 uppercase">{currentSellerName || 'Independent Seller'}</p>
-                    <p className="text-[9px] font-bold text-brand uppercase tracking-tighter">Verified Identity • ID: {currentSellerId}</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Select Seller Profile</label>
-                  <div className="flex gap-1">
-                    <button 
-                      type="button"
-                      onClick={(e) => {
-                        const el = e.currentTarget.parentElement?.parentElement?.nextElementSibling?.nextElementSibling;
-                        if (el) el.scrollLeft -= 150;
-                      }}
-                      className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-slate-900 transition-colors"
-                    >
-                      <ChevronRight className="w-4 h-4 rotate-180" />
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={(e) => {
-                        const el = e.currentTarget.parentElement?.parentElement?.nextElementSibling?.nextElementSibling;
-                        if (el) el.scrollLeft += 150;
-                      }}
-                      className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-slate-900 transition-colors"
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="relative group">
-                  <input
-                    type="text"
-                    placeholder="Search seller by name..."
-                    value={sellerSearch}
-                    onChange={(e) => setSellerSearch(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 rounded-xl bg-white border border-slate-200 focus:outline-none focus:border-brand text-xs font-bold uppercase tracking-widest transition-all"
-                  />
-                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                    <ShoppingBasket className="w-4 h-4" />
-                  </div>
-                </div>
-
-                <div className="flex gap-3 overflow-x-auto pb-4 snap-x -mx-1 px-1 scroll-smooth no-scrollbar md:scrollbar-thin scrollbar-thumb-slate-200">
-                <button
-                  type="button"
-                  onClick={() => setFormData({ 
-                    ...formData, 
-                    seller: '', 
-                    seller_logo: '', 
-                    seller_whatsapp: '',
-                    seller_email: '',
-                    seller_facebook: '',
-                    seller_instagram: '',
-                    seller_tiktok: ''
-                  })}
-                  className={cn(
-                    "snap-start flex flex-col items-center gap-2 p-2.5 rounded-2xl border transition-all shrink-0 min-w-[80px] cursor-pointer",
-                    formData.seller === '' 
-                      ? "bg-slate-900 border-brand shadow-lg scale-105" 
-                      : "bg-white border-slate-100 hover:border-slate-300 hover:bg-slate-50"
-                  )}
-                >
-                  <div className={cn(
-                    "w-12 h-12 rounded-xl flex items-center justify-center border-2",
-                    formData.seller === '' ? "bg-slate-800 border-brand" : "bg-slate-50 border-slate-100"
-                  )}>
-                    <Store className={cn("w-6 h-6", formData.seller === '' ? "text-brand" : "text-slate-400")} />
-                  </div>
-                  <span className={cn("text-[9px] font-black uppercase tracking-widest truncate max-w-[70px]", formData.seller === '' ? "text-white" : "text-slate-500")}>No Seller</span>
-                </button>
-                {sellers.filter(s => s.name.toLowerCase().includes(sellerSearch.toLowerCase())).map((s) => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => setFormData({ 
-                      ...formData, 
-                      seller: s.name, 
-                      seller_logo: s.logo || '', 
-                      seller_whatsapp: s.whatsapp_number || '',
-                      seller_email: s.email || '',
-                      seller_facebook: s.facebook || '',
-                      seller_instagram: s.instagram || '',
-                      seller_tiktok: s.tiktok || ''
-                    })}
-                    className={cn(
-                      "snap-start flex flex-col items-center gap-2 p-2.5 rounded-2xl border transition-all shrink-0 min-w-[80px] cursor-pointer",
-                      formData.seller === s.name 
-                        ? "bg-slate-900 border-brand shadow-lg scale-105" 
-                        : "bg-white border-slate-100 hover:border-slate-300 hover:bg-slate-50"
-                    )}
-                  >
-                    <div className={cn(
-                      "w-12 h-12 rounded-xl overflow-hidden border-2",
-                      formData.seller === s.name ? "border-brand" : "border-slate-100"
-                    )}>
-                      {s.logo ? (
-                        <img src={s.logo} alt={s.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full bg-slate-100 flex items-center justify-center">
-                          <Store className="w-6 h-6 text-slate-300" />
-                        </div>
-                      )}
-                    </div>
-                    <span className={cn("text-[9px] font-black uppercase tracking-widest truncate max-w-[70px]", formData.seller === s.name ? "text-white" : "text-slate-500")}>
-                      {s.name}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {!isSeller && (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-2">
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">WhatsApp Number</label>
-                  <input
-                    type="text"
-                    value={formData.seller_whatsapp}
-                    onChange={e => setFormData({ ...formData, seller_whatsapp: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 focus:outline-none text-[10px] font-bold"
-                    placeholder="WhatsApp..."
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Email Address</label>
-                  <input
-                    type="text"
-                    value={formData.seller_email}
-                    onChange={e => setFormData({ ...formData, seller_email: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 focus:outline-none text-[10px] font-bold"
-                    placeholder="Email..."
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Facebook</label>
-                  <input
-                    type="text"
-                    value={formData.seller_facebook}
-                    onChange={e => setFormData({ ...formData, seller_facebook: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 focus:outline-none text-[10px] font-bold"
-                    placeholder="Facebook..."
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Instagram</label>
-                  <input
-                    type="text"
-                    value={formData.seller_instagram}
-                    onChange={e => setFormData({ ...formData, seller_instagram: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 focus:outline-none text-[10px] font-bold"
-                    placeholder="Instagram..."
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">TikTok</label>
-                  <input
-                    type="text"
-                    value={formData.seller_tiktok}
-                    onChange={e => setFormData({ ...formData, seller_tiktok: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 focus:outline-none text-[10px] font-bold"
-                    placeholder="TikTok..."
-                  />
-                </div>
-                <div className="space-y-1 col-span-2 sm:col-span-1">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Seller Logo URL</label>
-                  <input
-                    type="text"
-                    value={formData.seller_logo}
-                    onChange={e => setFormData({ ...formData, seller_logo: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 focus:outline-none text-[10px] font-bold"
-                    placeholder="Logo URL..."
-                  />
-                </div>
-              </div>
-              )}
-            </div>
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Category</label>
               <select
@@ -1079,6 +931,216 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
                 ))}
               </select>
             </div>
+            <div className="space-y-1.5 flex flex-col justify-end">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Promotion</label>
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, is_super_sale: !formData.is_super_sale })}
+                className={cn(
+                  "flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border w-full",
+                  formData.is_super_sale 
+                    ? "bg-amber-500 border-amber-500 text-white shadow-lg shadow-amber-200" 
+                    : "bg-slate-50 border-slate-200 text-slate-400"
+                )}
+              >
+                <Star className={cn("w-3.5 h-3.5", formData.is_super_sale ? "fill-current animate-pulse" : "")} />
+                {formData.is_super_sale ? 'Active Super Sale' : 'Mark Super Sale'}
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {isSeller ? (
+              <div className="p-4 bg-brand/5 border border-brand/20 rounded-2xl flex items-center gap-4">
+                <div className="w-12 h-12 bg-slate-900 rounded-xl flex items-center justify-center text-white font-black text-xs">
+                  {(currentSellerName || 'S').slice(0, 2).toUpperCase()}
+                </div>
+                <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Listing As Partner</p>
+                  <p className="text-sm font-black text-slate-900 uppercase">{currentSellerName || 'Independent Seller'}</p>
+                  <p className="text-[9px] font-bold text-brand uppercase tracking-tighter">Verified Identity • ID: {currentSellerId}</p>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-slate-50/50 p-4 rounded-2xl border border-slate-200/60">
+                <div className="flex items-center justify-between mb-3">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Select Seller Profile</label>
+                  <div className="flex gap-1">
+                    <button 
+                      type="button"
+                      onClick={(e) => {
+                        const el = e.currentTarget.parentElement?.parentElement?.nextElementSibling?.nextElementSibling;
+                        if (el) el.scrollLeft -= 200;
+                      }}
+                      className="p-1 hover:bg-white rounded shadow-sm text-slate-400 hover:text-slate-900 transition-all border border-transparent hover:border-slate-200"
+                    >
+                      <ArrowLeft className="w-3.5 h-3.5" />
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={(e) => {
+                        const el = e.currentTarget.parentElement?.parentElement?.nextElementSibling?.nextElementSibling;
+                        if (el) el.scrollLeft += 200;
+                      }}
+                      className="p-1 hover:bg-white rounded shadow-sm text-slate-400 hover:text-slate-900 transition-all border border-transparent hover:border-slate-200"
+                    >
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="relative group mb-4">
+                  <input
+                    type="text"
+                    placeholder="Search seller by name..."
+                    value={sellerSearch}
+                    onChange={(e) => setSellerSearch(e.target.value)}
+                    className="w-full pl-10 pr-4 py-3 rounded-xl bg-white border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand text-[11px] font-bold uppercase tracking-widest transition-all"
+                  />
+                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
+                    <ShoppingBasket className="w-4 h-4" />
+                  </div>
+                </div>
+
+                <div className="flex gap-4 overflow-x-auto pb-4 snap-x -mx-1 px-1 scroll-smooth no-scrollbar">
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ 
+                      ...formData, 
+                      seller: '', 
+                      seller_id: '',
+                      seller_logo: '', 
+                      seller_whatsapp: '',
+                      seller_email: '',
+                      seller_facebook: '',
+                      seller_instagram: '',
+                      seller_tiktok: ''
+                    })}
+                    className={cn(
+                      "snap-start flex flex-col items-center gap-2 p-3 rounded-2xl border transition-all shrink-0 min-w-[100px] cursor-pointer",
+                      formData.seller === '' 
+                        ? "bg-slate-900 border-slate-900 shadow-xl scale-105" 
+                        : "bg-white border-slate-200 hover:border-slate-400"
+                    )}
+                  >
+                    <div className={cn(
+                      "w-12 h-12 rounded-xl flex items-center justify-center border-2",
+                      formData.seller === '' ? "bg-slate-800 border-brand" : "bg-slate-50 border-slate-100"
+                    )}>
+                      <Store className={cn("w-6 h-6", formData.seller === '' ? "text-brand" : "text-slate-400")} />
+                    </div>
+                    <span className={cn("text-[10px] font-black uppercase tracking-widest truncate max-w-[80px]", formData.seller === '' ? "text-white" : "text-slate-600")}>Official</span>
+                  </button>
+                  {sellers.filter(s => s.name.toLowerCase().includes(sellerSearch.toLowerCase())).map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => setFormData({ 
+                        ...formData, 
+                        seller: s.name, 
+                        seller_id: s.seller_id || s.id,
+                        seller_logo: s.logo || '', 
+                        seller_whatsapp: s.whatsapp_number || '',
+                        seller_email: s.email || '',
+                        seller_facebook: s.facebook || '',
+                        seller_instagram: s.instagram || '',
+                        seller_tiktok: s.tiktok || ''
+                      })}
+                      className={cn(
+                        "snap-start flex flex-col items-center gap-2 p-3 rounded-2xl border transition-all shrink-0 min-w-[100px] cursor-pointer",
+                        formData.seller === s.name 
+                          ? "bg-slate-900 border-slate-900 shadow-xl scale-105" 
+                          : "bg-white border-slate-200 hover:border-slate-400"
+                      )}
+                    >
+                      <div className={cn(
+                        "w-12 h-12 rounded-xl overflow-hidden border-2",
+                        formData.seller === s.name ? "border-brand" : "border-slate-100"
+                      )}>
+                        {s.logo ? (
+                          <img src={s.logo} alt={s.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full bg-slate-100 flex items-center justify-center">
+                            <Store className="w-6 h-6 text-slate-300" />
+                          </div>
+                        )}
+                      </div>
+                      <span className={cn("text-[10px] font-black uppercase tracking-widest truncate max-w-[80px]", formData.seller === s.name ? "text-white" : "text-slate-600")}>
+                        {s.name}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {!isSeller && (
+              <div className="bg-slate-50/50 p-4 rounded-2xl border border-slate-200/60 mt-4">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Manual Seller Information Override</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">WhatsApp</label>
+                    <input
+                      type="text"
+                      value={formData.seller_whatsapp}
+                      onChange={e => setFormData({ ...formData, seller_whatsapp: e.target.value })}
+                      className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 focus:outline-none text-[10px] font-bold"
+                      placeholder="WhatsApp..."
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Email</label>
+                    <input
+                      type="text"
+                      value={formData.seller_email}
+                      onChange={e => setFormData({ ...formData, seller_email: e.target.value })}
+                      className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 focus:outline-none text-[10px] font-bold"
+                      placeholder="Email..."
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Facebook</label>
+                    <input
+                      type="text"
+                      value={formData.seller_facebook}
+                      onChange={e => setFormData({ ...formData, seller_facebook: e.target.value })}
+                      className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 focus:outline-none text-[10px] font-bold"
+                      placeholder="Facebook URL..."
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Instagram</label>
+                    <input
+                      type="text"
+                      value={formData.seller_instagram}
+                      onChange={e => setFormData({ ...formData, seller_instagram: e.target.value })}
+                      className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 focus:outline-none text-[10px] font-bold"
+                      placeholder="Instagram URL..."
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">TikTok</label>
+                    <input
+                      type="text"
+                      value={formData.seller_tiktok}
+                      onChange={e => setFormData({ ...formData, seller_tiktok: e.target.value })}
+                      className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 focus:outline-none text-[10px] font-bold"
+                      placeholder="TikTok URL..."
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Logo URL</label>
+                    <input
+                      type="text"
+                      value={formData.seller_logo}
+                      onChange={e => setFormData({ ...formData, seller_logo: e.target.value })}
+                      className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 focus:outline-none text-[10px] font-bold"
+                      placeholder="Logo URL..."
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">

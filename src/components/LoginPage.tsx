@@ -20,6 +20,7 @@ interface LoginPageProps {
 export default function LoginPage({ onLogin }: LoginPageProps) {
   const [activeTab, setActiveTab] = useState<'admin' | 'seller' | 'register'>('seller');
   const [password, setPassword] = useState('');
+  const [pin, setPin] = useState('');
   const [sellerIdInput, setSellerIdInput] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -35,10 +36,10 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
 
   const handleAdminLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (password === 's10d10k5@') {
+    if (password === 'Correct-Horse-Battery-Staple-Quats-2026!' && pin === '4565') {
       onLogin({ role: 'admin' });
     } else {
-      setError('Invalid admin password');
+      setError('Invalid admin credentials');
     }
   };
 
@@ -158,9 +159,21 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                                 type="password"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                placeholder="••••••••"
+                                placeholder="Root Password"
                                 required
                                 className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-brand focus:border-transparent outline-none transition-all font-mono"
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Secure PIN</label>
+                            <input
+                                type="password"
+                                inputMode="numeric"
+                                value={pin}
+                                onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                                placeholder="••••"
+                                required
+                                className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-brand focus:border-transparent outline-none transition-all font-mono text-center tracking-[1em]"
                             />
                         </div>
                         {error && <p className="text-rose-500 text-[10px] font-black uppercase tracking-wider text-center bg-rose-50 p-2 rounded-lg">{error}</p>}
