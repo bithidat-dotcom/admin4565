@@ -29,6 +29,10 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
+  const [otpVerifyOrderId, setOtpVerifyOrderId] = useState<string | null>(null);
+  const [generatedOtp, setGeneratedOtp] = useState<string>('');
+  const [enteredOtp, setEnteredOtp] = useState<string>('');
+  const [otpError, setOtpError] = useState<string>('');
   const [isTableView, setIsTableView] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -145,6 +149,11 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
   };
 
   const updateStatus = async (id: string, newStatus: Order['status']) => {
+    if (newStatus === 'confirmed') {
+      initiateOtpVerification(id);
+      return;
+    }
+    
     setStatusUpdatingId(id);
     try {
       const updates: any = { status: newStatus };
@@ -227,9 +236,40 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
     }
   };
 
+  const initiateOtpVerification = (id: string) => {
+    const otp = Math.floor(1000 + Math.random() * 9000).toString();
+    setGeneratedOtp(otp);
+    setOtpVerifyOrderId(id);
+    setEnteredOtp('');
+    setOtpError('');
+    
+    // Simulate sending SMS
+    console.log(`[OTP SENT] To order ${id}: ${otp}`);
+    alert(`Verification PIN: ${otp} (Simulated SMS sent to buyer)`);
+  };
+
+  const verifyOtp = async () => {
+    if (enteredOtp === generatedOtp) {
+      if (otpVerifyOrderId) {
+        setStatusUpdatingId(otpVerifyOrderId);
+        try {
+          await updateDoc(doc(db, 'orders', otpVerifyOrderId), { status: 'confirmed' });
+          setOtpVerifyOrderId(null);
+        } catch (err: any) {
+          handleFirestoreError(err, OperationType.UPDATE, `orders/${otpVerifyOrderId}`);
+        } finally {
+          setStatusUpdatingId(null);
+        }
+      }
+    } else {
+      setOtpError('Invalid OTP code. Please check again.');
+    }
+  };
+
   const getStatusColor = (status: Order['status']) => {
     switch (status) {
       case 'pending': return 'bg-amber-100 text-amber-700';
+      case 'confirmed': return 'bg-teal-100 text-teal-700';
       case 'packing': return 'bg-blue-100 text-blue-700';
       case 'shipping': return 'bg-indigo-100 text-indigo-700';
       case 'delivered': return 'bg-emerald-100 text-emerald-700';
@@ -453,7 +493,7 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
                               <div className="space-y-3">
                                 <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Update Operational Stage</p>
                                 <div className="grid grid-cols-2 gap-2">
-                                  {['pending', 'packing', 'shipping', 'delivered', 'completed', 'cancelled'].map((status) => (
+                                  {['pending', 'confirmed', 'packing', 'shipping', 'delivered', 'completed', 'cancelled'].map((status) => (
                                     <button
                                       key={status}
                                       onClick={() => updateStatus(order.id, status as Order['status'])}
@@ -503,6 +543,71 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
           </div>
         )}
       </main>
+
+      <Modal
+        isOpen={otpVerifyOrderId !== null}
+        onClose={() => setOtpVerifyOrderId(null)}
+        title="Buyer OTP Verification"
+      >
+        <div className="space-y-6">
+          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 text-center">Confirming Order For</p>
+            {otpVerifyOrderId && orders.find(o => o.id === otpVerifyOrderId) && (
+              <div className="text-center">
+                <p className="text-lg font-black text-slate-900 uppercase">
+                  {orders.find(o => o.id === otpVerifyOrderId)?.customer_name}
+                </p>
+                <div className="flex items-center justify-center gap-2 mt-1 text-emerald-600">
+                  <Phone className="w-3 h-3" />
+                  <p className="text-sm font-bold tracking-tight">
+                    {orders.find(o => o.id === otpVerifyOrderId)?.whatsapp_number}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-3">
+            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest text-center block">Enter 4-Digit OTP Code</label>
+            <div className="flex justify-center gap-3">
+              <input
+                type="text"
+                maxLength={4}
+                value={enteredOtp}
+                onChange={(e) => setEnteredOtp(e.target.value.replace(/\D/g, ''))}
+                placeholder="0 0 0 0"
+                className="w-full max-w-[200px] text-center text-3xl font-black tracking-[0.5em] py-4 rounded-2xl bg-white border-2 border-slate-200 focus:border-brand focus:ring-4 focus:ring-brand/10 outline-none transition-all font-mono"
+              />
+            </div>
+            {otpError && <p className="text-rose-500 text-[10px] font-black uppercase text-center">{otpError}</p>}
+            <p className="text-[9px] text-slate-400 text-center font-bold">The buyer should have received an OTP via WhatsApp or SMS.</p>
+          </div>
+
+          <div className="flex gap-4">
+            <button
+              onClick={verifyOtp}
+              disabled={enteredOtp.length < 4 || statusUpdatingId !== null}
+              className="flex-1 py-4 bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-200 active:scale-98 transition-all text-white text-xs font-black uppercase tracking-widest rounded-2xl shadow-lg shadow-emerald-100 flex items-center justify-center gap-2"
+            >
+              {statusUpdatingId ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+              Verify & Confirm
+            </button>
+            <button
+              onClick={() => setOtpVerifyOrderId(null)}
+              className="px-6 py-4 bg-slate-100 hover:bg-slate-200 text-slate-500 text-xs font-black uppercase tracking-widest rounded-2xl transition-all"
+            >
+              Cancel
+            </button>
+          </div>
+
+          <button 
+            onClick={() => initiateOtpVerification(otpVerifyOrderId!)}
+            className="w-full text-[10px] font-black text-brand uppercase tracking-widest hover:underline"
+          >
+            Resend OTP Code
+          </button>
+        </div>
+      </Modal>
 
       <Modal
         isOpen={orderToDelete !== null}

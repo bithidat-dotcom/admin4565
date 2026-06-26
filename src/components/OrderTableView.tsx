@@ -17,6 +17,7 @@ export default function OrderTableView({ orders, onStatusChange, statusUpdatingI
   const getStatusColor = (status: Order['status']) => {
     switch (status) {
       case 'pending': return 'bg-amber-100/80 text-amber-800 border border-amber-200/50';
+      case 'confirmed': return 'bg-teal-100/80 text-teal-800 border border-teal-200/50';
       case 'packing': return 'bg-blue-100/80 text-blue-800 border border-blue-200/50';
       case 'shipping': return 'bg-indigo-100/80 text-indigo-800 border border-indigo-200/50';
       case 'delivered': return 'bg-emerald-100/80 text-emerald-800 border border-emerald-200/50';
@@ -185,6 +186,7 @@ export default function OrderTableView({ orders, onStatusChange, statusUpdatingI
               <th className="px-3 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest">Product</th>
               <th className="px-3 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest">Qty</th>
               <th className="px-3 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest">Seller</th>
+              <th className="px-3 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest">Status</th>
               <th className="px-3 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">Actions</th>
             </tr>
           </thead>
@@ -200,14 +202,31 @@ export default function OrderTableView({ orders, onStatusChange, statusUpdatingI
                 <td className="px-3 py-4 text-xs font-bold text-slate-800">{order.product_name || 'Generic'}</td>
                 <td className="px-3 py-4 text-xs text-slate-600">{order.quantity || 1}</td>
                 <td className="px-3 py-4 text-xs text-slate-600">{order.seller || 'N/A'}</td>
+                <td className="px-3 py-4">
+                   <select 
+                     value={order.status}
+                     onChange={(e) => onStatusChange(order.id, e.target.value as Order['status'])}
+                     disabled={statusUpdatingId === order.id}
+                     className={cn(
+                       "text-[9px] font-black uppercase tracking-widest px-2 py-1.5 rounded-lg border-0 focus:ring-2 focus:ring-slate-200 outline-none transition-all cursor-pointer",
+                       getStatusColor(order.status)
+                     )}
+                   >
+                     {['pending', 'confirmed', 'packing', 'shipping', 'delivered', 'completed', 'cancelled'].map(s => (
+                       <option key={s} value={s}>{s}</option>
+                     ))}
+                   </select>
+                </td>
                 <td className="px-3 py-4 text-right">
-                  <button 
-                    onClick={() => handlePrint(order)} 
-                    className="p-2 bg-slate-50 border border-slate-200/60 rounded-xl hover:bg-slate-100 transition-colors shadow-sm cursor-pointer"
-                    title="Print PDF Invoice"
-                  >
-                    <Printer className="w-4 h-4 text-slate-500" />
-                  </button>
+                  <div className="flex items-center justify-end gap-2">
+                    <button 
+                      onClick={() => handlePrint(order)} 
+                      className="p-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors shadow-sm cursor-pointer"
+                      title="Print PDF Invoice"
+                    >
+                      <Printer className="w-3.5 h-3.5 text-slate-500" />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

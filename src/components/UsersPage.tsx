@@ -23,6 +23,7 @@ export default function UsersPage({ onViewChange }: UsersPageProps) {
   const [userOrders, setUserOrders] = useState<Order[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [isTableView, setIsTableView] = useState(false);
 
   const handleCopy = (id: string, text: string) => {
     navigator.clipboard.writeText(text);
@@ -219,7 +220,28 @@ export default function UsersPage({ onViewChange }: UsersPageProps) {
 
   return (
     <div className="flex-1 overflow-x-hidden">
-      <Header title="Customer Profiles" />
+      <Header title="Customer Profiles">
+        <div className="flex items-center bg-slate-100 p-1 rounded-xl">
+          <button
+            onClick={() => setIsTableView(false)}
+            className={cn(
+              "px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+              !isTableView ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+            )}
+          >
+            Grid
+          </button>
+          <button
+            onClick={() => setIsTableView(true)}
+            className={cn(
+              "px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+              isTableView ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+            )}
+          >
+            Table
+          </button>
+        </div>
+      </Header>
 
       <main className="p-4 md:p-8">
 
@@ -227,6 +249,93 @@ export default function UsersPage({ onViewChange }: UsersPageProps) {
         {loading ? (
           <div className="flex items-center justify-center h-64">
             <Loader2 className="w-8 h-8 text-brand animate-spin" />
+          </div>
+        ) : isTableView ? (
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/50 border-b border-slate-100">
+                    <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Customer</th>
+                    <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Mobile Number</th>
+                    <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Location</th>
+                    <th className="px-6 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Wallet</th>
+                    <th className="px-6 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Orders</th>
+                    <th className="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {combinedUserProfiles.map((user) => (
+                    <tr key={user.id} className="hover:bg-slate-50/80 transition-colors group">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center font-black text-slate-400 text-xs uppercase shrink-0">
+                            {user.name?.charAt(0) || '?'}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-bold text-slate-900 text-sm truncate uppercase tracking-tight">{user.name}</p>
+                            <span className={cn(
+                              "text-[8px] font-black uppercase tracking-widest",
+                              user.isGuest ? "text-amber-500" : "text-emerald-500"
+                            )}>
+                              {user.isGuest ? 'Guest' : 'Member'}
+                            </span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                            <Phone className="w-3.5 h-3.5" />
+                          </div>
+                          <span className="font-mono text-sm font-bold text-slate-700">{user.whatsapp_number}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2 text-slate-500">
+                          <MapPin className="w-3.5 h-3.5 shrink-0" />
+                          <span className="text-xs font-medium truncate max-w-[200px]">{user.location || 'N/A'}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-emerald-50 border border-emerald-100 text-emerald-700">
+                          <span className="font-black text-xs">৳</span>
+                          <span className="font-bold text-xs">{formatCurrency(user.wallet_balance || 0).replace('৳', '')}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <span className="inline-flex items-center justify-center min-w-[24px] h-6 px-1.5 rounded-full bg-slate-100 text-slate-600 font-black text-[10px] border border-slate-200">
+                          {user.total_orders || 0}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => viewUserOrders(user)}
+                            className="p-2 text-slate-400 hover:text-brand hover:bg-white rounded-xl transition-all shadow-sm border border-transparent hover:border-slate-200"
+                            title="View History"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                          </button>
+                          {!user.isGuest && (
+                            <button
+                              onClick={() => {
+                                setSelectedUserForBalance(user);
+                                setNewBalanceValue(String(user.wallet_balance || 0));
+                              }}
+                              className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-white rounded-xl transition-all shadow-sm border border-transparent hover:border-slate-200"
+                              title="Adjust Wallet"
+                            >
+                              <Coins className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">

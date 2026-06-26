@@ -46,7 +46,7 @@ export interface Order {
   seller_whatsapp?: string;
   user_id?: string;
   cancelled_by?: 'user' | 'admin';
-  status: 'pending' | 'packing' | 'shipping' | 'delivered' | 'completed' | 'cancelled';
+  status: 'pending' | 'confirmed' | 'packing' | 'shipping' | 'delivered' | 'completed' | 'cancelled';
   created_at: string;
 }
 

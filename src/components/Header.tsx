@@ -5,9 +5,10 @@ interface HeaderProps {
   title: string;
   onAction?: () => void;
   actionLabel?: string;
+  children?: React.ReactNode;
 }
 
-export default function Header({ title, onAction, actionLabel }: HeaderProps) {
+export default function Header({ title, onAction, actionLabel, children }: HeaderProps) {
   const handleMenuClick = () => {
     window.dispatchEvent(new CustomEvent('open-sidebar'));
   };
@@ -35,6 +36,7 @@ export default function Header({ title, onAction, actionLabel }: HeaderProps) {
             className="bg-transparent border-none outline-none text-[10px] md:text-[11px] font-black uppercase tracking-widest w-full placeholder:text-slate-400 transition-all"
           />
         </div>
+        {children}
       </div>
       
       <div className="flex items-center gap-3 md:gap-6 ml-2 shrink-0">
