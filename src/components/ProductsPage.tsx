@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc, Timestamp, writeBatch, getDocs, serverTimestamp, limit } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc, Timestamp, writeBatch, getDocs, serverTimestamp, limit, where } from 'firebase/firestore';
 import { Product, Seller } from '../types';
 import Header from '../components/Header';
 import Modal from '../components/Modal';
@@ -110,6 +110,15 @@ function DiscountTimer({ expiresAt }: { expiresAt: string }) {
   );
 }
 
+const isNew = (dateString: string) => {
+  if (!dateString) return false;
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffTime = Math.abs(now.getTime() - date.getTime());
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays <= 3;
+};
+
 export default function ProductsPage({ defaultCategory = 'All', onCategoryFilterChange, onViewChange, userSession }: ProductsPageProps = {}) {
   const [products, setProducts] = useState<Product[]>([]);
   const [sellers, setSellers] = useState<Seller[]>([]);
@@ -185,7 +194,17 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
 
   useEffect(() => {
     // Limited query to save quota
-    const q = query(collection(db, 'products'), orderBy('created_at', 'desc'), limit(500));
+    let q;
+    if (isSeller && currentSellerId) {
+      q = query(
+        collection(db, 'products'), 
+        where('seller_id', '==', currentSellerId),
+        orderBy('created_at', 'desc'), 
+        limit(500)
+      );
+    } else {
+      q = query(collection(db, 'products'), orderBy('created_at', 'desc'), limit(500));
+    }
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const productsData = snapshot.docs.map(doc => ({
@@ -202,7 +221,7 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [isSeller, currentSellerId]);
 
   useEffect(() => {
     const fetchSellers = async () => {
@@ -439,6 +458,7 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
         title="Products" 
         onAction={handleOpenAddModal} 
         actionLabel="New Product" 
+        onSearch={setFilterName}
       />
 
       {/* Category Quick Filter Bar */}
@@ -555,8 +575,19 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
                       -{product.discount}%
                     </div>
                   )}
+                  {isNew(product.created_at) && (
+                    <div className={cn(
+                      "absolute bg-brand text-white text-[10px] font-black px-2 py-1 rounded tracking-widest uppercase z-10 animate-pulse shadow-lg shadow-brand/20",
+                      product.discount > 0 ? "top-10 left-3" : "top-3 left-3"
+                    )}>
+                      NEW
+                    </div>
+                  )}
                   {product.is_super_sale && (
-                    <div className="absolute top-10 left-3 bg-amber-500 text-white text-[9px] font-black px-2 py-1 rounded tracking-widest uppercase z-10 flex items-center gap-1 shadow-lg shadow-amber-500/20">
+                    <div className={cn(
+                      "absolute left-3 bg-amber-500 text-white text-[9px] font-black px-2 py-1 rounded tracking-widest uppercase z-10 flex items-center gap-1 shadow-lg shadow-amber-500/20",
+                      (product.discount > 0 && isNew(product.created_at)) ? "top-16" : (product.discount > 0 || isNew(product.created_at)) ? "top-10" : "top-3"
+                    )}>
                       <Star className="w-2.5 h-2.5 fill-current" />
                       Super Sale
                     </div>

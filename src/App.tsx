@@ -10,6 +10,7 @@ import SellersPage from './components/SellersPage';
 import LoginPage from './components/LoginPage';
 import LinkConverterModal from './components/LinkConverterModal';
 import PopupAd from './components/PopupAd';
+import MobileNav from './components/MobileNav';
 import { View } from './types';
 import { motion, AnimatePresence } from 'motion/react';
 import { db } from './lib/firebase';
@@ -30,10 +31,9 @@ export default function App() {
   const [isGlobalConverterOpen, setIsGlobalConverterOpen] = useState(false);
 
   useEffect(() => {
-    // Only run stock synchronization if admin is logged in (to prevent seller quota use/interception)
-    if (!isAuthenticated || userSession?.role !== 'admin') return;
+    if (!isAuthenticated) return;
     
-    // Background listener to automatically adjust product stock in real-time when orders are placed or cancelled
+    // Background listener to automatically adjust product stock and repair missing seller data
     // Limited to recent 50 orders to save quota and only handle active business flow
     const qBackground = query(collection(db, 'orders'), orderBy('created_at', 'desc'), limit(50));
     const unsubscribe = onSnapshot(qBackground, async (snapshot) => {
@@ -47,74 +47,100 @@ export default function App() {
 
         if (!productName) continue;
 
-        // Is it created very recently (e.g. within last 1 hour) or is it a modification of status?
-        const orderTime = orderData.created_at?.toDate?.() || new Date(orderData.created_at || Date.now());
-        const isRecent = (Date.now() - orderTime.getTime()) < 60 * 60 * 1000; // 1 hour threshold
-
-        // Case 1: Subtract stock on a fresh order placement (must be a recent order, or actively added/modified)
-        if (status !== 'cancelled' && !isAdjusted && (change.type === 'added' ? isRecent : change.type === 'modified')) {
+        // --- 1. REPAIR MISSING SELLER_ID ---
+        // If order was placed without seller_id, lookup from product and fix it
+        if (!orderData.seller_id) {
           try {
             const pQuery = query(collection(db, 'products'), where('name', '==', productName));
             const pSnap = await getDocs(pQuery);
             if (!pSnap.empty) {
-              const pDoc = pSnap.docs[0];
-              const pData = pDoc.data();
-              const currentStock = Number(pData.stock) || 0;
-              const currentQty = Number(pData.quantity) || Number(pData.qty) || 0;
-              const currentSold = Number(pData.sold) || 0;
-
-              await updateDoc(pDoc.ref, {
-                stock: Math.max(0, currentStock - quantity),
-                quantity: Math.max(0, currentQty - quantity),
-                qty: Math.max(0, currentQty - quantity),
-                sold: currentSold + quantity
-              });
-              
-              await updateDoc(doc(db, 'orders', orderId), {
-                stock_adjusted: true
-              });
-              console.log(`Auto-adjusted stock for product [${productName}] on order placement: -${quantity}`);
-            } else {
-              // mark handled anyway so we don't keep retrying
-              await updateDoc(doc(db, 'orders', orderId), {
-                stock_adjusted: true
-              });
+              const pData = pSnap.docs[0].data();
+              if (pData.seller_id) {
+                await updateDoc(doc(db, 'orders', orderId), {
+                  seller_id: pData.seller_id,
+                  seller: pData.seller || 'N/A'
+                });
+                console.log(`Repaired seller_id for order ${orderId} -> ${pData.seller_id}`);
+              }
             }
           } catch (e) {
-            console.error("Error auto-adjusting stock on order placement:", e);
+            console.error("Error repairing seller_id:", e);
           }
         }
-        
-        // Case 2: Restore stock if the order gets cancelled (can be any historical edit)
-        else if (status === 'cancelled' && isAdjusted && change.type === 'modified') {
-          try {
-            const pQuery = query(collection(db, 'products'), where('name', '==', productName));
-            const pSnap = await getDocs(pQuery);
-            if (!pSnap.empty) {
-              const pDoc = pSnap.docs[0];
-              const pData = pDoc.data();
-              const currentStock = Number(pData.stock) || 0;
-              const currentQty = Number(pData.quantity) || Number(pData.qty) || 0;
-              const currentSold = Number(pData.sold) || 0;
 
-              await updateDoc(pDoc.ref, {
-                stock: currentStock + quantity,
-                quantity: currentQty + quantity,
-                qty: currentQty + quantity,
-                sold: Math.max(0, currentSold - quantity)
-              });
-              
-              await updateDoc(doc(db, 'orders', orderId), {
-                stock_adjusted: false
-              });
-              console.log(`Restored stock for product [${productName}] on order cancellation: +${quantity}`);
-            } else {
-              await updateDoc(doc(db, 'orders', orderId), {
-                stock_adjusted: false
-              });
+        // --- 2. STOCK ADJUSTMENT ---
+        // Only proceed with adjustment logic if we are Admin OR the owner of the order
+        const isAdmin = userSession?.role === 'admin';
+        const isOwner = userSession?.sellerId && (orderData.seller_id === userSession.sellerId || orderData.seller === userSession.name);
+        
+        if (isAdmin || isOwner) {
+          // Case 1: Subtract stock on a fresh order placement
+          const orderTime = orderData.created_at?.toDate?.() || new Date(orderData.created_at || Date.now());
+          const isRecent = (Date.now() - orderTime.getTime()) < 60 * 60 * 1000;
+
+          if (status !== 'cancelled' && !isAdjusted && (change.type === 'added' ? isRecent : change.type === 'modified')) {
+            try {
+              const pQuery = query(collection(db, 'products'), where('name', '==', productName));
+              const pSnap = await getDocs(pQuery);
+              if (!pSnap.empty) {
+                const pDoc = pSnap.docs[0];
+                const pData = pDoc.data();
+                const currentStock = Number(pData.stock) || 0;
+                const currentQty = Number(pData.quantity) || Number(pData.qty) || 0;
+                const currentSold = Number(pData.sold) || 0;
+
+                await updateDoc(pDoc.ref, {
+                  stock: Math.max(0, currentStock - quantity),
+                  quantity: Math.max(0, currentQty - quantity),
+                  qty: Math.max(0, currentQty - quantity),
+                  sold: currentSold + quantity
+                });
+                
+                await updateDoc(doc(db, 'orders', orderId), {
+                  stock_adjusted: true
+                });
+                console.log(`Auto-adjusted stock for product [${productName}] on order placement: -${quantity}`);
+              } else {
+                await updateDoc(doc(db, 'orders', orderId), {
+                  stock_adjusted: true
+                });
+              }
+            } catch (e) {
+              console.error("Error auto-adjusting stock on order placement:", e);
             }
-          } catch (e) {
-            console.error("Error restoring stock on order cancellation:", e);
+          }
+          
+          // Case 2: Restore stock if the order gets cancelled
+          else if (status === 'cancelled' && isAdjusted && change.type === 'modified') {
+            try {
+              const pQuery = query(collection(db, 'products'), where('name', '==', productName));
+              const pSnap = await getDocs(pQuery);
+              if (!pSnap.empty) {
+                const pDoc = pSnap.docs[0];
+                const pData = pDoc.data();
+                const currentStock = Number(pData.stock) || 0;
+                const currentQty = Number(pData.quantity) || Number(pData.qty) || 0;
+                const currentSold = Number(pData.sold) || 0;
+
+                await updateDoc(pDoc.ref, {
+                  stock: currentStock + quantity,
+                  quantity: currentQty + quantity,
+                  qty: currentQty + quantity,
+                  sold: Math.max(0, currentSold - quantity)
+                });
+                
+                await updateDoc(doc(db, 'orders', orderId), {
+                  stock_adjusted: false
+                });
+                console.log(`Restored stock for product [${productName}] on order cancellation: +${quantity}`);
+              } else {
+                await updateDoc(doc(db, 'orders', orderId), {
+                  stock_adjusted: false
+                });
+              }
+            } catch (e) {
+              console.error("Error restoring stock on order cancellation:", e);
+            }
           }
         }
       }
@@ -123,7 +149,7 @@ export default function App() {
     });
 
     return () => unsubscribe();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, userSession]);
 
   useEffect(() => {
     const authStatus = localStorage.getItem('isAdminAuthenticated');
@@ -172,7 +198,7 @@ export default function App() {
     const isSeller = userSession?.role === 'seller';
     
     // Auto-redirect sellers to products if they try to access prohibited areas
-    if (isSeller && ['workers', 'banners', 'settings', 'users', 'reviews', 'sellers'].includes(currentView)) {
+    if (isSeller && ['workers', 'banners', 'settings', 'users', 'reviews'].includes(currentView)) {
       return (
         <ProductsPage 
             defaultCategory={filterCategory}
@@ -214,7 +240,7 @@ export default function App() {
       case 'users':
         return <UsersPage onViewChange={setCurrentView} />;
       case 'sellers':
-        return <SellersPage />;
+        return <SellersPage userSession={userSession} />;
       default:
         return <Dashboard onViewChange={setCurrentView} />;
     }
@@ -232,7 +258,7 @@ export default function App() {
         userSession={userSession}
       />
       
-      <div className="md:pl-64 pl-0 min-h-screen flex flex-col">
+      <div className="md:pl-64 pl-0 min-h-screen flex flex-col pb-20 md:pb-0">
         <AnimatePresence mode="wait">
           <motion.div
             key={currentView}
@@ -246,6 +272,8 @@ export default function App() {
           </motion.div>
         </AnimatePresence>
       </div>
+
+      <MobileNav currentView={currentView} onViewChange={setCurrentView} />
 
       <LinkConverterModal 
         isOpen={isGlobalConverterOpen} 

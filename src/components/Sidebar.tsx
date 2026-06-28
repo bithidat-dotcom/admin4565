@@ -22,7 +22,7 @@ export default function Sidebar({ currentView, onViewChange, isOpen = false, onC
     { id: 'orders' as View, icon: ShoppingCart, label: 'Orders', adminOnly: false },
     { id: 'banners' as View, icon: ImageIcon, label: 'Banners', adminOnly: true },
     { id: 'reviews' as View, icon: Star, label: 'Reviews', adminOnly: true },
-    { id: 'sellers' as View, icon: Store, label: 'Sellers', adminOnly: true },
+    { id: 'sellers' as View, icon: Store, label: 'Sellers', adminOnly: false },
   ].filter(item => !isSeller || !item.adminOnly);
 
   return (

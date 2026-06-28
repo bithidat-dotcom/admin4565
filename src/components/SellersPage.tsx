@@ -32,7 +32,15 @@ import {
 import ImageUploader from './ImageUploader';
 import { cn, formatCurrency } from '../lib/utils';
 
-export default function SellersPage() {
+interface SellersPageProps {
+  userSession?: any;
+}
+
+export default function SellersPage({ userSession }: SellersPageProps) {
+  const isSeller = userSession?.role === 'seller';
+  const currentSellerId = userSession?.sellerId || '';
+  const isAdmin = userSession?.role === 'admin';
+
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -119,6 +127,13 @@ export default function SellersPage() {
 
   const handleEdit = (seller: Seller, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
+    
+    // Permission Check: Admin can edit anyone, Seller can only edit themselves
+    if (!isAdmin && seller.seller_id !== currentSellerId) {
+      alert("Unauthorized: You can only edit your own profile.");
+      return;
+    }
+
     setEditingSeller(seller);
     setFormData({
       seller_id: seller.seller_id || '',
@@ -284,8 +299,9 @@ export default function SellersPage() {
     <div className="flex-1 bg-slate-50 min-h-screen">
       <Header 
         title="Sellers Hub" 
-        onAction={() => { resetForm(); setIsModalOpen(true); }} 
+        onAction={isAdmin ? () => { resetForm(); setIsModalOpen(true); } : undefined} 
         actionLabel="Register Partner" 
+        onSearch={setSearchTerm}
       />
 
       <main className="p-4 md:p-8 space-y-6 w-full max-w-[1600px] mx-auto">
@@ -444,13 +460,15 @@ export default function SellersPage() {
                       </div>
 
                       <div className="flex items-center justify-between w-full mt-auto pt-3 border-t border-slate-100 gap-2.5">
-                        <button 
-                          onClick={(e) => handleEdit(seller, e)}
-                          className="p-2 bg-slate-50 text-slate-600 rounded-xl hover:bg-slate-100 transition-colors border border-slate-200 hover:text-slate-900 cursor-pointer text-xs"
-                          title="Edit Partner"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
+                        {(isAdmin || seller.seller_id === currentSellerId) && (
+                          <button 
+                            onClick={(e) => handleEdit(seller, e)}
+                            className="p-2 bg-slate-50 text-slate-600 rounded-xl hover:bg-slate-100 transition-colors border border-slate-200 hover:text-slate-900 cursor-pointer text-xs"
+                            title="Edit Partner"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                         <button 
                           onClick={() => setSelectedDashboardSeller(seller)}
                           className="flex-1 py-1.5 bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white rounded-xl text-[9px] font-black uppercase tracking-widest transition-all duration-300 border border-indigo-100/40 hover:border-indigo-600 cursor-pointer flex items-center justify-center gap-1.5"
@@ -458,14 +476,16 @@ export default function SellersPage() {
                           <LayoutDashboard className="w-3 h-3" />
                           Dashboard
                         </button>
-                        <button 
-                          onClick={(e) => handleDelete(seller.id, e)}
-                          disabled={deletingId === seller.id}
-                          className="p-2 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-100 transition-colors border border-rose-200/50 cursor-pointer text-xs"
-                          title="Delete Partner"
-                        >
-                          {deletingId === seller.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                        </button>
+                        {isAdmin && (
+                          <button 
+                            onClick={(e) => handleDelete(seller.id, e)}
+                            disabled={deletingId === seller.id}
+                            className="p-2 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-100 transition-colors border border-rose-200/50 cursor-pointer text-xs"
+                            title="Delete Partner"
+                          >
+                            {deletingId === seller.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                          </button>
+                        )}
                       </div>
                     </div>
                   );

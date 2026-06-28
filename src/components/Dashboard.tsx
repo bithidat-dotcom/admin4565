@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, onSnapshot, query, orderBy, limit, getDocs, where } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, limit, getDocs, where, or } from 'firebase/firestore';
 import Header from '../components/Header';
 import LoadingDots from './LoadingDots';
 import { 
@@ -74,12 +74,25 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
   const [boardNote, setBoardNote] = useState(() => localStorage.getItem('dashboard_define_note') || 'Welcome to the pbazar admin hub! Set daily target numbers, notice highlights, or custom operational parameters here.');
   const [isNoteEditing, setIsNoteEditing] = useState(false);
 
+  const [searchTerm, setSearchTerm] = useState('');
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setMounted(true);
     }, 150);
     return () => clearTimeout(timer);
   }, []);
+
+  const filteredRecentOrders = recentOrders.filter(order => {
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      (order.product_name?.toLowerCase() || '').includes(searchLower) ||
+      (order.customer_name?.toLowerCase() || '').includes(searchLower) ||
+      (order.whatsapp_number || '').includes(searchTerm) ||
+      (order.seller?.toLowerCase() || '').includes(searchLower) ||
+      (order.seller_id?.toLowerCase() || '').includes(searchLower)
+    );
+  });
 
   useEffect(() => {
     // Helper to get stats from cache
@@ -98,7 +111,10 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
     if (isSeller && !isShowingGlobal) {
       qOrders = query(
         collection(db, 'orders'), 
-        where('seller_id', '==', currentSellerId),
+        or(
+          where('seller_id', '==', currentSellerId),
+          where('seller', '==', currentSellerName)
+        ),
         orderBy('created_at', 'desc'), 
         limit(150)
       );
@@ -182,7 +198,7 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
       unsubscribeOrders();
       unsubscribeProducts();
     };
-  }, [isShowingGlobal]);
+  }, [isShowingGlobal, isSeller, currentSellerId]);
 
   const totalStock = productsList.reduce((sum, p) => sum + (p.stock ?? 0), 0);
   const totalSold = productsList.reduce((sum, p) => sum + (p.sold ?? 0), 0);
@@ -197,10 +213,10 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
   );
 
   const statCards = [
+    { label: 'TOTAL SALES COUNT', value: stats.totalOrders.toString(), icon: ShoppingCart, color: 'text-brand', bg: 'bg-brand-light border border-brand/20', change: 'Total Orders Tracked', changeColor: 'text-brand' },
     { label: 'PAST EARN (REALIZED)', value: formatCurrency(pastEarn), icon: TrendingUp, color: 'text-emerald-500', bg: 'bg-emerald-50/70 border border-emerald-100', change: 'Delivered or Completed', changeColor: 'text-emerald-500' },
     { label: 'FUTURE EARN (PENDING)', value: formatCurrency(futureEarn), icon: TrendingUp, color: 'text-amber-500', bg: 'bg-amber-50/70 border border-amber-100', change: 'Awaiting Fulfillment', changeColor: 'text-amber-500' },
     { label: 'DELIVERY REVENUE', value: formatCurrency(stats.totalRevenue), icon: TrendingUp, color: 'text-indigo-500', bg: 'bg-indigo-50/75 border border-indigo-100', change: 'Active & complete', changeColor: 'text-indigo-550' },
-    { label: 'LIVE ORDERS', value: stats.totalOrders.toString(), icon: ShoppingCart, color: 'text-brand', bg: 'bg-indigo-50/70 border border-indigo-100', change: `${stats.pendingOrders} pending check`, changeColor: 'text-brand' },
     { label: 'PRODUCTS TOTAL', value: stats.totalProducts.toString(), icon: ShoppingBag, color: 'text-slate-700', bg: 'bg-slate-50 border border-slate-200/60', change: `${totalStock} in stock • ${totalSold} sold`, changeColor: 'text-slate-500' },
     !isSeller && { label: 'SELLERS BASE', value: stats.totalSellers.toString(), icon: Users, color: 'text-purple-500', bg: 'bg-purple-50 border border-purple-100', change: `${stats.totalUsers} customers`, changeColor: 'text-purple-550' },
   ].filter(Boolean) as any[];
@@ -231,10 +247,10 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
   });
 
   return (
-    <div className="flex-1 overflow-x-hidden">
-      <Header title="Dashboard" />
+    <div className="flex-1 overflow-x-hidden pb-24 md:pb-0">
+      <Header title="Dashboard" onSearch={setSearchTerm} />
 
-      <main className="p-4 md:p-8 space-y-4 md:space-y-8 w-full">
+      <main className="p-4 md:p-8 space-y-4 md:space-y-8 w-full max-w-[1600px] mx-auto">
         {loading ? (
           <div className="flex items-center justify-center h-64">
             <LoadingDots />
@@ -310,8 +326,8 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
               ))}
             </div>
 
-            {/* Dashboard Workspace / Definition Pen Tool Memo Board */}
-            <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm relative overflow-hidden group">
+            {/* Dashboard Workspace / Definition Pen Tool Memo Board - Hidden on mobile */}
+            <div className="hidden md:block bg-white rounded-3xl p-6 border border-slate-200 shadow-sm relative overflow-hidden group">
               <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
@@ -509,8 +525,8 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
                 </div>
               </div>
 
-              {/* Stock Alerts & Inventory Value Card */}
-              <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col shadow-sm">
+              {/* Stock Alerts & Inventory Value Card - Hidden on mobile */}
+              <div className="hidden md:flex bg-white rounded-2xl border border-slate-200 overflow-hidden flex-col shadow-sm">
                 <div className="p-6 border-b border-slate-100 flex items-center justify-between">
                   <div>
                     <h3 className="font-black text-slate-900 text-base uppercase tracking-tight flex items-center gap-2">
@@ -586,41 +602,49 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-slate-50/50">
-                        <th className="px-5 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Order ID</th>
-                        <th className="px-5 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Customer</th>
+                        <th className="px-5 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest hidden sm:table-cell">Order ID</th>
+                        <th className="px-5 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Client & Item</th>
+                        <th className="px-5 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest hidden md:table-cell">Seller</th>
                         <th className="px-5 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-right">Amount</th>
                         <th className="px-5 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center">Status</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {recentOrders.map((order, i) => (
+                      {filteredRecentOrders.map((order, i) => (
                         <tr key={i} className="hover:bg-slate-50/50 transition-colors">
-                          <td className="px-5 py-4 text-xs font-mono text-slate-400">#{order.id.slice(0, 8)}</td>
+                          <td className="px-5 py-4 text-xs font-mono text-slate-400 hidden sm:table-cell">#{order.id.slice(0, 8)}</td>
                           <td className="px-5 py-4">
-                            <div className="text-sm font-bold text-slate-900">{order.customer_name || 'Generic Customer'}</div>
+                            <div className="text-sm font-black text-slate-900 uppercase tracking-tight line-clamp-1">{order.customer_name || 'Generic Customer'}</div>
                             <div className="text-[10px] text-slate-400 font-bold">
                               {order.whatsapp_number || 'No contact'}
                             </div>
+                            <div className="text-[10px] text-brand font-black mt-1.5 uppercase tracking-widest">
+                              {order.product_name || 'Product Info'}
+                            </div>
                           </td>
-                          <td className="px-5 py-4 text-sm font-black text-slate-900 text-right">{formatCurrency(order.price)}</td>
+                          <td className="px-5 py-4 hidden md:table-cell">
+                            <div className="text-xs font-black text-slate-900 uppercase tracking-tight">{order.seller || 'N/A'}</div>
+                            {order.seller_id && <div className="text-[9px] text-indigo-500 font-bold uppercase tracking-widest">ID: {order.seller_id}</div>}
+                          </td>
+                          <td className="px-5 py-4 text-sm font-black text-slate-900 text-right whitespace-nowrap">{formatCurrency(order.price)}</td>
                           <td className="px-5 py-4 text-center">
                             <span className={cn(
-                              "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
-                              order.status === 'delivered' ? "bg-emerald-100 text-emerald-700" :
-                              order.status === 'completed' ? "bg-slate-900 text-white" :
-                              order.status === 'pending' ? "bg-amber-100 text-amber-700" :
-                              order.status === 'cancelled' ? "bg-red-100 text-red-700" :
-                              "bg-indigo-100 text-indigo-700"
+                              "px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border shrink-0 inline-block",
+                              order.status === 'delivered' ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
+                              order.status === 'completed' ? "bg-slate-900 text-white border-slate-900" :
+                              order.status === 'pending' ? "bg-amber-50 text-amber-600 border-amber-100" :
+                              order.status === 'cancelled' ? "bg-red-50 text-red-600 border-red-100" :
+                              "bg-indigo-50 text-indigo-600 border-indigo-100"
                             )}>
                               {order.status}
                             </span>
                           </td>
                         </tr>
                       ))}
-                      {recentOrders.length === 0 && (
+                      {filteredRecentOrders.length === 0 && (
                         <tr>
-                          <td colSpan={4} className="px-5 py-12 text-center text-slate-400 text-sm italic font-bold uppercase tracking-widest">
-                            No orders detected in data stream.
+                          <td colSpan={5} className="px-5 py-12 text-center text-slate-400 text-sm italic font-bold uppercase tracking-widest">
+                            No matching orders detected in data stream.
                           </td>
                         </tr>
                       )}
@@ -647,7 +671,8 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
                   </div>
                 )}
 
-                <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+                {/* Cancellation Alerts - Hidden on mobile */}
+                <div className="hidden md:block bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
                   <h3 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
                     <Trash2 className="w-4 h-4 text-red-500" />
                     Cancellation Alerts

@@ -40,8 +40,10 @@ export interface Order {
   price: number;
   product_details: string;
   product_name?: string;
+  product_image?: string;
   quantity?: number | string;
   seller?: string;
+  seller_id?: string;
   seller_logo?: string;
   seller_whatsapp?: string;
   user_id?: string;

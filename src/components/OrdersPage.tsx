@@ -1,17 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, onSnapshot, query, orderBy, updateDoc, deleteDoc, doc, where, getDocs, limit } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, updateDoc, deleteDoc, doc, where, getDocs, limit, or } from 'firebase/firestore';
 import { Order } from '../types';
 import Header from '../components/Header';
 import Modal from './Modal';
 import OrderTableView from './OrderTableView';
 import LoadingDots from './LoadingDots';
-import { Loader2, Phone, MapPin, Package, Clock, CheckCircle, Search, Trash2, ShieldCheck, Lock, Copy, Check, MessageSquare, Store } from 'lucide-react';
+import { Loader2, Phone, MapPin, Package, Clock, CheckCircle, Search, Trash2, ShieldCheck, Lock, Copy, Check, MessageSquare, Store, ShoppingBag, Truck, Coins, Printer, MoreVertical } from 'lucide-react';
 import { formatCurrency, cn, exportToCSV } from '../lib/utils';
 import { format, isSameDay } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
 import { Calendar } from 'lucide-react';
 import { decryptData, encryptData } from '../lib/security';
+import { handlePrint } from '../lib/printing';
 
 interface OrdersPageProps {
   userSession?: any;
@@ -47,16 +48,32 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
   // Safe Non-Blocking Confirmation States
   const [orderToDelete, setOrderToDelete] = useState<string | null>(null);
 
+  const [sellerSearch, setSellerSearch] = useState('');
+
   useEffect(() => {
     // 1. Listen to limited set of recent orders (quota saving)
     let q;
     if (isSeller) {
-      // If seller_id is not yet common in orders, we might need to filter by name for now, 
-      // but ideally use seller_id.
       q = query(
         collection(db, 'orders'), 
-        where('seller_id', '==', currentSellerId),
+        or(
+          where('seller_id', '==', currentSellerId),
+          where('seller', '==', currentSellerName)
+        ),
         orderBy('created_at', 'desc'), 
+        limit(300)
+      );
+    } else if (sellerSearch.trim()) {
+      // Admin searching for specific seller orders
+      const search = sellerSearch.trim();
+      const searchLower = search.toLowerCase();
+      q = query(
+        collection(db, 'orders'),
+        or(
+          where('seller_id', '==', searchLower),
+          where('seller', '==', search)
+        ),
+        orderBy('created_at', 'desc'),
         limit(300)
       );
     } else {
@@ -102,7 +119,7 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
     return () => {
       unsubscribe();
     };
-  }, []);
+  }, [isSeller, currentSellerId, sellerSearch]);
 
   const syncUserStats = async (whatsappNumber: string) => {
     if (!whatsappNumber) return;
@@ -181,8 +198,12 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
     const matchesSearch = 
       (order.customer_name?.toLowerCase() || '').includes(searchLower) ||
       (order.whatsapp_number || '').includes(searchQuery) ||
+      (order.product_name?.toLowerCase() || '').includes(searchLower) ||
       (order.product_details?.toLowerCase() || '').includes(searchLower) ||
-      (order.location?.toLowerCase() || '').includes(searchLower);
+      (order.location?.toLowerCase() || '').includes(searchLower) ||
+      (order.seller?.toLowerCase() || '').includes(searchLower) ||
+      (order.seller_id?.toLowerCase() || '').includes(searchLower) ||
+      (order.id.toLowerCase().includes(searchLower));
 
     const matchesDate = dateFilter 
       ? isSameDay(new Date(order.created_at), new Date(dateFilter))
@@ -271,23 +292,75 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
       case 'pending': return 'bg-amber-100 text-amber-700';
       case 'confirmed': return 'bg-teal-100 text-teal-700';
       case 'packing': return 'bg-blue-100 text-blue-700';
-      case 'shipping': return 'bg-indigo-100 text-indigo-700';
+      case 'shipping': return 'bg-orange-100 text-orange-700';
       case 'delivered': return 'bg-emerald-100 text-emerald-700';
-      case 'completed': return 'bg-slate-900 text-white';
+      case 'completed': return 'bg-brand text-white';
       case 'cancelled': return 'bg-red-100 text-red-700';
       default: return 'bg-slate-100 text-slate-700';
     }
   };
 
   return (
-    <div className="flex-1 overflow-x-hidden">
-      <Header title="Orders" />
+    <div className="flex-1 overflow-x-hidden pb-24 md:pb-0">
+      <Header title="Orders" onSearch={setSearchQuery} />
 
       <main className="p-4 md:p-8">
+        {/* Quick Stats Summary Box */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-all">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Volume</p>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-brand/10 flex items-center justify-center">
+                <ShoppingBag className="w-5 h-5 text-brand" />
+              </div>
+              <div>
+                <p className="text-2xl font-black text-slate-900 leading-tight">{orders.length}</p>
+                <p className="text-[9px] font-bold text-slate-400 uppercase">Orders Processed</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-all">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Confirmed</p>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-teal-50 flex items-center justify-center">
+                <CheckCircle className="w-5 h-5 text-teal-500" />
+              </div>
+              <div>
+                <p className="text-2xl font-black text-slate-900 leading-tight">{orders.filter(o => o.status === 'confirmed').length}</p>
+                <p className="text-[9px] font-bold text-slate-400 uppercase">Ready to Ship</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-all">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Delivered</p>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-50 flex items-center justify-center">
+                <Truck className="w-5 h-5 text-emerald-500" />
+              </div>
+              <div>
+                <p className="text-2xl font-black text-slate-900 leading-tight">{orders.filter(o => o.status === 'delivered' || o.status === 'completed').length}</p>
+                <p className="text-[9px] font-bold text-slate-400 uppercase">Successful Deliveries</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-all">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Gross Sales</p>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-amber-50 flex items-center justify-center">
+                <Coins className="w-5 h-5 text-amber-500" />
+              </div>
+              <div>
+                <p className="text-2xl font-black text-slate-900 leading-tight">৳{orders.reduce((acc, o) => acc + (o.price || 0), 0).toLocaleString()}</p>
+                <p className="text-[9px] font-bold text-slate-400 uppercase">Revenue Stream</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
-          <div className="flex gap-2 bg-white p-1 rounded-xl border border-slate-200">
-             <button onClick={() => setIsTableView(true)} className={cn("px-4 py-2 rounded-lg text-xs font-black", isTableView ? "bg-slate-900 text-white" : "text-slate-500")}>Table View</button>
-             <button onClick={() => setIsTableView(false)} className={cn("px-4 py-2 rounded-lg text-xs font-black", !isTableView ? "bg-slate-900 text-white" : "text-slate-500")}>Card View</button>
+          <div className="flex gap-2 bg-white p-1 rounded-xl border border-slate-200 shadow-sm">
+             <button onClick={() => setIsTableView(true)} className={cn("px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all", isTableView ? "bg-brand text-white shadow-md shadow-brand/20" : "text-slate-400 hover:text-slate-600")}>Table View</button>
+             <button onClick={() => setIsTableView(false)} className={cn("px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all", !isTableView ? "bg-brand text-white shadow-md shadow-brand/20" : "text-slate-400 hover:text-slate-600")}>Card View</button>
           </div>
           <div className="flex flex-wrap items-center gap-4">
             <div className="bg-white border border-slate-200 rounded-xl px-4 py-2 text-xs text-slate-500 flex items-center gap-2 font-bold uppercase tracking-widest hover:bg-slate-50 transition-colors cursor-pointer" onClick={selectAll}>
@@ -302,7 +375,7 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
 
             <button 
                 onClick={() => exportToCSV(filteredOrders, 'orders')}
-                className="bg-white border border-indigo-200 text-indigo-600 rounded-xl px-4 py-2 text-xs font-black uppercase tracking-widest hover:bg-indigo-50 transition-colors"
+                className="bg-white border border-brand/20 text-brand rounded-xl px-4 py-2 text-[10px] font-black uppercase tracking-widest hover:bg-brand-light transition-all shadow-sm"
             >
                 Export CSV
             </button>
@@ -321,6 +394,24 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
                 </button>
               )}
             </div>
+
+            {!isSeller && (
+              <div className="bg-white border border-slate-200 rounded-xl px-4 py-2.5 flex items-center gap-3 w-full sm:w-64">
+                <Store className="w-4 h-4 text-slate-400" />
+                <input 
+                  type="text" 
+                  placeholder="FIND SELLER ID..."
+                  value={sellerSearch}
+                  onChange={(e) => setSellerSearch(e.target.value)}
+                  className="bg-transparent border-none outline-none text-xs font-black text-slate-700 uppercase tracking-widest w-full"
+                />
+                {sellerSearch && (
+                  <button onClick={() => setSellerSearch('')} className="text-slate-300 hover:text-red-500">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            )}
             
             <div className="bg-white border border-slate-200 px-4 py-2.5 rounded-xl flex items-center gap-2 w-full sm:w-auto">
               <Search className="w-4 h-4 text-slate-400" />
@@ -355,174 +446,180 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
                   {filteredOrders.map((order) => (
                     <motion.div
                       layout
-                      initial={{ opacity: 0, scale: 0.98 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.98 }}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
                       key={order.id}
                       className={cn(
-                        "bg-white rounded-2xl border p-0 overflow-hidden transition-all duration-300 relative",
-                        selectedOrders.has(order.id) ? "border-brand shadow-lg shadow-brand/10 ring-2 ring-brand/10" : "border-slate-200 hover:shadow-md"
+                        "bg-white rounded-[40px] border overflow-hidden shadow-2xl shadow-slate-200/50 hover:shadow-brand/10 transition-all duration-700 group relative",
+                        selectedOrders.has(order.id) ? "border-brand ring-4 ring-brand/5" : "border-slate-100"
                       )}
                     >
-                      {/* Status Bar */}
-                      <div className={cn("h-1.5 w-full", getStatusColor(order.status).split(' ')[0])} />
+                      {/* Selection Overlay */}
+                      <div className="absolute top-8 right-8 z-20">
+                        <input 
+                          type="checkbox" 
+                          className="w-6 h-6 rounded-xl border-slate-200 text-brand focus:ring-brand cursor-pointer shadow-sm transition-all"
+                          checked={selectedOrders.has(order.id)}
+                          onChange={() => toggleSelection(order.id)}
+                        />
+                      </div>
 
-                      <div className="p-6">
-                        <div className="absolute top-6 right-6 z-10">
-                          <input 
-                            type="checkbox" 
-                            className="w-5 h-5 rounded border-slate-300 text-brand focus:ring-brand cursor-pointer"
-                            checked={selectedOrders.has(order.id)}
-                            onChange={() => toggleSelection(order.id)}
-                          />
+                      {/* Status Indicator Bar */}
+                      <div className={cn("h-2.5 w-full", getStatusColor(order.status).split(' ')[0])} />
+
+                      <div className="p-10">
+                        {/* Header: ID and Status */}
+                        <div className="flex items-start justify-between mb-10 pr-12">
+                          <div className="space-y-1.5">
+                            <div className="flex items-center gap-2">
+                              <span className={cn("w-2.5 h-2.5 rounded-full animate-pulse", getStatusColor(order.status).split(' ')[0])} />
+                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">ORDER ID #{order.id.slice(-6).toUpperCase()}</p>
+                            </div>
+                            <h3 className="text-3xl font-black text-slate-900 uppercase tracking-tighter leading-none">{order.customer_name || 'Generic Customer'}</h3>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{format(new Date(order.created_at), 'MMMM d, yyyy • h:mm a')}</p>
+                          </div>
+                          <div className={cn(
+                            "px-6 py-2.5 rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-lg shadow-current/5 ring-1 ring-inset transition-all",
+                            getStatusColor(order.status).replace('text-', 'ring-').replace('bg-', 'bg-opacity-50 ')
+                          )}>
+                            {order.status}
+                          </div>
                         </div>
 
-                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                          {/* Customer Info Section (Left) */}
-                          <div className="lg:col-span-4 space-y-6">
-                            <div>
-                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Customer Details</p>
-                              <h3 className="font-black text-slate-900 text-2xl uppercase tracking-tighter leading-tight bg-slate-50 p-3 rounded-xl border border-slate-100 mb-4">
-                                {order.customer_name || 'Generic Customer'}
-                              </h3>
-                            </div>
-
-                            <div className="space-y-4">
-                              <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl relative group">
-                                <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-1">WhatsApp Primary Hub</p>
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+                          {/* Left Side: Contact and Location */}
+                          <div className="lg:col-span-5 space-y-6">
+                            <div className="flex items-center gap-5 bg-slate-50 p-5 rounded-[32px] border border-slate-100 group-hover:bg-white transition-all duration-500 hover:shadow-inner">
+                              <div className="w-14 h-14 rounded-2xl bg-brand/10 flex items-center justify-center shrink-0 shadow-inner">
+                                <Phone className="w-6 h-6 text-brand" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Primary Contact</p>
                                 <div className="flex items-center justify-between">
-                                  <span className="text-lg font-black text-emerald-700 tracking-tight">{order.whatsapp_number}</span>
-                                  <div className="flex items-center gap-2">
-                                    <button
-                                      onClick={() => handleCopy(`${order.id}-wa`, order.whatsapp_number)}
-                                      className="p-2 bg-white text-slate-400 hover:text-brand rounded-lg shadow-sm transition-all"
-                                    >
-                                      {copiedId === `${order.id}-wa` ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
-                                    </button>
-                                    <a
-                                      href={`https://wa.me/${order.whatsapp_number.replace(/[^0-9]/g, '').startsWith('01') ? '88' + order.whatsapp_number.replace(/[^0-9]/g, '') : order.whatsapp_number.replace(/[^0-9]/g, '')}`}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      className="p-2 bg-emerald-500 text-white rounded-lg shadow-sm hover:bg-emerald-600 transition-all"
-                                    >
-                                      <MessageSquare className="w-4 h-4" />
-                                    </a>
-                                  </div>
+                                  <p className="text-xl font-black text-slate-900 tracking-tight truncate">{order.whatsapp_number}</p>
+                                  <a
+                                    href={`https://wa.me/${order.whatsapp_number?.replace(/[^0-9]/g, '')}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="p-2 text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all shadow-sm"
+                                  >
+                                    <MessageSquare className="w-5 h-5" />
+                                  </a>
                                 </div>
                               </div>
+                            </div>
 
-                              <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl">
-                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Shipping Location</p>
-                                <div className="flex items-start gap-2">
-                                  <MapPin className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
-                                  <span className="text-sm font-bold text-slate-700 leading-snug">{order.location}</span>
-                                </div>
+                            <div className="flex items-start gap-5 p-4 bg-rose-50/30 rounded-[32px] border border-rose-100/50">
+                              <div className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center shrink-0 shadow-sm">
+                                <MapPin className="w-6 h-6 text-rose-500" />
+                              </div>
+                              <div className="flex-1">
+                                <p className="text-[10px] font-black text-rose-400 uppercase tracking-widest mb-1">Shipping Hub</p>
+                                <p className="text-sm font-bold text-slate-600 leading-relaxed line-clamp-2">{order.location}</p>
                               </div>
                             </div>
                           </div>
 
-                          {/* Product & Payload Section (Center) */}
-                          <div className="lg:col-span-5 space-y-6">
-                            <div>
-                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Order Content</p>
-                              <div className="bg-brand/5 border border-brand/10 p-4 rounded-2xl">
-                                {order.product_name && (
-                                  <div className="mb-4">
-                                    <p className="text-[9px] font-black text-brand uppercase tracking-widest mb-1">Product Title</p>
-                                    <h4 className="text-xl font-black text-slate-900 tracking-tighter">{order.product_name}</h4>
-                                  </div>
-                                )}
-                                
-                                <div className="grid grid-cols-2 gap-4 mb-4">
-                                  <div className="bg-white p-3 rounded-xl border border-brand/10 shadow-sm">
-                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Quantity</p>
-                                    <p className="text-lg font-black text-brand">{order.quantity || '1'} Items</p>
-                                  </div>
-                                  <div className="bg-white p-3 rounded-xl border border-brand/10 shadow-sm">
-                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Subtotal</p>
-                                    <p className="text-lg font-black text-slate-900">{formatCurrency(order.price)}</p>
+                          {/* Right Side: Product Details */}
+                          <div className="lg:col-span-7 bg-slate-900 rounded-[40px] p-8 text-white relative overflow-hidden group/payload shadow-2xl shadow-slate-900/20">
+                            <div className="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full -mr-24 -mt-24 blur-3xl transition-all duration-700 group-hover/payload:scale-150" />
+                            <div className="relative z-10">
+                              <div className="flex justify-between items-start mb-6">
+                                <div className="flex gap-4 items-start">
+                                  {order.product_image && (
+                                    <img src={order.product_image} referrerPolicy="no-referrer" alt="Product" className="w-20 h-20 rounded-2xl object-cover border-2 border-white/10 shadow-xl shrink-0" />
+                                  )}
+                                  <div className="flex-1">
+                                    <p className="text-[10px] font-black text-white/30 uppercase tracking-widest mb-2">Item Payload</p>
+                                    <h4 className="text-2xl font-black text-white tracking-tight leading-tight mb-2">{order.product_name || 'Generic Product'}</h4>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-[10px] font-black bg-brand/20 text-brand px-2 py-1 rounded-md uppercase">Batch 1.0</span>
+                                      <span className="text-[10px] font-black bg-white/10 text-white/60 px-2 py-1 rounded-md uppercase">{order.quantity || 1} Units</span>
+                                    </div>
                                   </div>
                                 </div>
-
-                                <div className="bg-white/50 p-3 rounded-xl border border-brand/5">
-                                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Merchant / Seller</p>
-                                  <div className="flex items-center gap-3">
-                                    {order.seller_logo || (order.seller && sellers[order.seller]?.logo) ? (
-                                      <img 
-                                        src={order.seller_logo || sellers[order.seller!]?.logo} 
-                                        alt="Seller" 
-                                        className="w-8 h-8 rounded-lg object-cover border border-slate-200"
-                                      />
-                                    ) : (
-                                      <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center border border-slate-200">
-                                        <Store className="w-4 h-4 text-slate-400" />
-                                      </div>
-                                    )}
-                                    <span className="font-black text-slate-700 uppercase tracking-tight text-sm">
-                                      {order.seller || 'pbazar Official'}
-                                    </span>
-                                  </div>
+                                <div className="text-right">
+                                  <p className="text-[10px] font-black text-white/30 uppercase tracking-widest mb-1">Subtotal</p>
+                                  <p className="text-3xl font-black text-white tracking-tighter">৳{order.price.toLocaleString()}</p>
                                 </div>
                               </div>
-                            </div>
-
-                            <div>
-                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Instructions / Details</p>
-                              <div className="bg-slate-50 border border-slate-100 p-4 rounded-2xl">
-                                <p className="text-sm font-bold text-slate-600 whitespace-pre-wrap leading-relaxed">
-                                  {order.product_details || 'No additional specifications provided.'}
+                              
+                              <div className="pt-6 border-t border-white/10 flex items-center gap-4">
+                                <p className="text-[10px] font-black text-white/30 uppercase tracking-widest shrink-0">Specs:</p>
+                                <p className="text-xs font-medium text-white/60 truncate italic">
+                                  {order.product_details || 'No specific parameters provided.'}
                                 </p>
                               </div>
                             </div>
                           </div>
+                        </div>
 
-                          {/* Management & Status Section (Right) */}
-                          <div className="lg:col-span-3">
-                            <div className="bg-slate-900 rounded-2xl p-5 text-white h-full space-y-6">
-                              <div className="border-b border-white/10 pb-4">
-                                <p className="text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Current Deployment Status</p>
-                                <div className={cn(
-                                  "inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest",
-                                  getStatusColor(order.status)
-                                )}>
-                                  <CheckCircle className="w-3 h-3" />
-                                  {order.status}
-                                </div>
+                        {/* Actions and Footer */}
+                        <div className="mt-10 pt-10 border-t border-slate-100 flex flex-wrap items-center justify-between gap-8">
+                          <div className="flex items-center gap-4">
+                            {order.seller_logo ? (
+                              <img src={order.seller_logo} referrerPolicy="no-referrer" alt="S" className="w-14 h-14 rounded-2xl object-cover border-4 border-white shadow-xl" />
+                            ) : (
+                              <div className="w-14 h-14 rounded-2xl bg-slate-50 flex items-center justify-center border-4 border-white shadow-xl">
+                                <Store className="w-6 h-6 text-slate-300" />
                               </div>
+                            )}
+                            <div>
+                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Fulfillment Partner</p>
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-black text-slate-900 uppercase tracking-tight">{order.seller || 'pbazar Official'}</p>
+                                {order.seller_id && (
+                                  <span className="text-[8px] font-black bg-indigo-50 text-indigo-500 px-1.5 py-0.5 rounded border border-indigo-100">ID: {order.seller_id}</span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1.5 mt-1">
+                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">Verified Merchant</span>
+                              </div>
+                            </div>
+                          </div>
 
-                              <div className="space-y-3">
-                                <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Update Operational Stage</p>
-                                <div className="grid grid-cols-2 gap-2">
+                          <div className="flex items-center gap-3">
+                            <button 
+                              onClick={() => handlePrint(order)}
+                              className="flex items-center gap-3 px-8 py-4 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-3xl text-[11px] font-black uppercase tracking-widest transition-all active:scale-95 border border-slate-200/50 shadow-sm"
+                            >
+                              <Printer className="w-4 h-4" />
+                              Print Invoice
+                            </button>
+                            
+                            <div className="relative group/menu">
+                              <button className="p-4 bg-brand hover:bg-brand-dark text-white rounded-[24px] shadow-2xl shadow-brand/30 transition-all active:scale-95">
+                                <MoreVertical className="w-6 h-6" />
+                              </button>
+                              
+                              <div className="absolute bottom-full right-0 mb-4 w-64 bg-slate-900 rounded-[32px] p-4 shadow-2xl opacity-0 invisible group-hover/menu:opacity-100 group-hover/menu:visible transition-all duration-500 z-50 translate-y-4 group-hover/menu:translate-y-0 backdrop-blur-xl border border-white/10">
+                                <p className="px-5 py-3 text-[9px] font-black text-white/40 uppercase tracking-widest border-b border-white/5 mb-3">Lifecycle Control</p>
+                                <div className="grid grid-cols-1 gap-1.5">
                                   {['pending', 'confirmed', 'packing', 'shipping', 'delivered', 'completed', 'cancelled'].map((status) => (
                                     <button
                                       key={status}
                                       onClick={() => updateStatus(order.id, status as Order['status'])}
                                       disabled={statusUpdatingId === order.id}
                                       className={cn(
-                                        "py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all border",
-                                        order.status === status
-                                          ? "bg-white text-slate-900 border-white"
-                                          : "bg-white/5 text-white/60 border-white/10 hover:bg-white/10"
+                                        "px-5 py-2.5 text-left rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all",
+                                        order.status === status ? "bg-brand text-white shadow-lg shadow-brand/20" : "text-white/50 hover:bg-white/10 hover:text-white"
                                       )}
                                     >
                                       {statusUpdatingId === order.id && order.status === status ? <Loader2 className="w-3 h-3 animate-spin mx-auto"/> : status}
                                     </button>
                                   ))}
                                 </div>
-                              </div>
-
-                              <div className="pt-4 space-y-3">
-                                <div className="flex items-center gap-2 text-white/40">
-                                  <Clock className="w-3 h-3" />
-                                  <span className="text-[9px] font-black uppercase tracking-widest">{format(new Date(order.created_at), 'PPP')}</span>
+                                <div className="mt-3 pt-3 border-t border-white/5">
+                                  <button 
+                                    onClick={() => handleDeleteOrder(order.id)}
+                                    disabled={deletingId === order.id}
+                                    className="w-full px-5 py-3 text-left text-rose-400 hover:bg-rose-500/10 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
+                                  >
+                                    Purge Data Record
+                                  </button>
                                 </div>
-                                <button
-                                  onClick={() => handleDeleteOrder(order.id)}
-                                  disabled={deletingId === order.id}
-                                  className="w-full py-3 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/20 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
-                                >
-                                  Purge Record
-                                </button>
                               </div>
                             </div>
                           </div>
