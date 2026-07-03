@@ -30,6 +30,7 @@ export interface Product {
   };
   discountExpiresAt?: string;
   is_super_sale?: boolean;
+  extra_categories?: string[];
 }
 
 export interface Order {
@@ -84,6 +85,7 @@ export interface User {
 export interface Seller {
   id: string;
   seller_id?: string;
+  password?: string;
   name: string;
   logo: string;
   whatsapp_number: string;

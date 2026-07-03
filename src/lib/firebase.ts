@@ -1,11 +1,23 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore, onSnapshot, collection, query, doc, setDoc, addDoc, updateDoc, deleteDoc, getDoc, getDocs, getDocFromServer, Timestamp } from 'firebase/firestore';
+import { getFirestore, onSnapshot, collection, query, doc, setDoc, addDoc, updateDoc, deleteDoc, getDoc, getDocs, getDocFromServer, Timestamp, enableMultiTabIndexedDbPersistence } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+
+// Enable persistence
+enableMultiTabIndexedDbPersistence(db).catch((err) => {
+    if (err.code === 'failed-precondition') {
+        // Multiple tabs open, persistence can only be enabled in one tab at a a time.
+        console.warn('Firestore persistence failed: Multiple tabs open');
+    } else if (err.code === 'unimplemented') {
+        // The current browser does not support all of the features required to enable persistence
+        console.warn('Firestore persistence failed: Browser not supported');
+    }
+});
+
 export const auth = getAuth(app);
 export const storage = getStorage(app);
 
@@ -61,8 +73,25 @@ export function handleFirestoreError(error: any, operationType: OperationType, p
 
   if (isQuotaError) {
     console.warn('Firestore Quota Exceeded for path:', path, '. Graceful degradation active.');
-    // Return the error info instead of throwing to allow components to handle it
-    return errInfo;
+    
+    // Safely dispatch event
+    try {
+      const event = new CustomEvent('firestore-quota-exceeded', { detail: { path, operationType } });
+      window.dispatchEvent(event);
+    } catch (e) {
+      // Fallback for environments where CustomEvent constructor is problematic
+      const event = document.createEvent('CustomEvent');
+      event.initCustomEvent('firestore-quota-exceeded', true, true, { path, operationType });
+      window.dispatchEvent(event);
+    }
+    
+    // For reads, we fail silently (allowing cache to take over)
+    if (operationType === OperationType.LIST || operationType === OperationType.GET) {
+      return errInfo;
+    }
+    
+    // For writes, we want to inform the user that their change wasn't saved
+    throw new Error("QUOTA_EXCEEDED: Daily database limit reached. Your changes could not be saved. Please try again tomorrow.");
   }
 
   console.error('Firestore Error: ', JSON.stringify(errInfo));

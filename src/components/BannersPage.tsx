@@ -5,6 +5,7 @@ import { Banner } from '../types';
 import Header from '../components/Header';
 import Modal from '../components/Modal';
 import LoadingDots from './LoadingDots';
+import { Storage } from '../lib/storage';
 import { Trash2, Loader2, Image as ImageIcon, Eye, Megaphone } from 'lucide-react';
 import { cn } from '../lib/utils';
 import ImageUploader from './ImageUploader';
@@ -122,7 +123,7 @@ export default function BannersPage() {
                       try {
                         await setDoc(doc(db, 'settings', 'adPopup'), { isActive: true, bannerId: banner.id }, { merge: true });
                         // Clear the seen flag so user can see it right away for verification
-                        localStorage.removeItem(`popupSeen_${banner.id}`);
+                        Storage.removeSmall(`popupSeen_${banner.id}`);
                         alert("Banner published as active Ad Popup! Refresh your app to see the change if needed, or it may appear instantly.");
                       } catch (err) {
                         console.error(err);

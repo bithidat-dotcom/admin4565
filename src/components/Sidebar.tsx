@@ -98,7 +98,13 @@ export default function Sidebar({ currentView, onViewChange, isOpen = false, onC
         <button
           type="button"
           onClick={() => {
-            window.dispatchEvent(new CustomEvent('open-link-converter'));
+            try {
+              window.dispatchEvent(new CustomEvent('open-link-converter'));
+            } catch (e) {
+              const event = document.createEvent('CustomEvent');
+              event.initCustomEvent('open-link-converter', true, true, {});
+              window.dispatchEvent(event);
+            }
             onClose();
           }}
           className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-black uppercase tracking-widest text-slate-500 hover:bg-slate-50 hover:text-indigo-600 transition-all duration-300 group cursor-pointer"

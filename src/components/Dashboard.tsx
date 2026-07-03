@@ -27,6 +27,7 @@ import {
   Check
 } from 'lucide-react';
 import { formatCurrency, cn } from '../lib/utils';
+import { Storage } from '../lib/storage';
 import { Order, Product } from '../types';
 import { 
   BarChart, 
@@ -71,7 +72,7 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
   const [isShowingGlobal, setIsShowingGlobal] = useState(false);
-  const [boardNote, setBoardNote] = useState(() => localStorage.getItem('dashboard_define_note') || 'Welcome to the pbazar admin hub! Set daily target numbers, notice highlights, or custom operational parameters here.');
+  const [boardNote, setBoardNote] = useState(() => Storage.getSmall('dashboard_define_note') || 'Welcome to the pbazar admin hub! Set daily target numbers, notice highlights, or custom operational parameters here.');
   const [isNoteEditing, setIsNoteEditing] = useState(false);
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -96,14 +97,26 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
 
   useEffect(() => {
     // Helper to get stats from cache
-    const cachedStats = localStorage.getItem('dashboard_stats_cache');
-    if (cachedStats) {
-      try {
-        setStats(JSON.parse(cachedStats));
-      } catch (e) {
-        console.error("Failed to parse cached stats", e);
+    const loadCache = async () => {
+      const cachedStats = Storage.getSmall<any>('dashboard_stats_cache');
+      if (cachedStats) {
+        setStats(cachedStats);
       }
-    }
+
+      // Load large data from IndexedDB for instant display/offline fallback
+      const cachedOrders = await Storage.getLarge<Order[]>('dashboard_orders_cache');
+      if (cachedOrders) {
+        setOrders(cachedOrders);
+        setRecentOrders(cachedOrders.slice(0, 5));
+      }
+
+      const cachedProducts = await Storage.getLarge<Product[]>('dashboard_products_cache');
+      if (cachedProducts) {
+        setProductsList(cachedProducts);
+      }
+    };
+    
+    loadCache();
 
     // Listen to orders for revenue, total count, and recent list
     // Use a limit to avoid fetching thousands of documents if they exist
@@ -115,19 +128,20 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
           where('seller_id', '==', currentSellerId),
           where('seller', '==', currentSellerName)
         ),
-        orderBy('created_at', 'desc'), 
-        limit(150)
+        limit(200)
       );
     } else {
-      qOrders = query(collection(db, 'orders'), orderBy('created_at', 'desc'), limit(150));
+      qOrders = query(collection(db, 'orders'), limit(300));
     }
 
     const unsubscribeOrders = onSnapshot(qOrders, (snapshot) => {
-      const allOrders = snapshot.docs.map(doc => ({ 
+      let allOrders = snapshot.docs.map(doc => ({ 
         id: doc.id, 
         ...doc.data(),
         created_at: doc.data().created_at?.toDate?.()?.toISOString() || doc.data().created_at || new Date().toISOString()
       })) as Order[];
+      
+      allOrders.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       
       const revenue = allOrders.reduce((sum, order) => 
         sum + (['delivered', 'shipping', 'packing', 'completed'].includes(order.status) ? order.price : 0), 0
@@ -141,11 +155,12 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
           totalRevenue: revenue,
           pendingOrders: pending
         };
-        localStorage.setItem('dashboard_stats_cache', JSON.stringify(newStats));
+        Storage.setSmall('dashboard_stats_cache', newStats);
         return newStats;
       });
       setOrders(allOrders);
       setRecentOrders(allOrders.slice(0, 5));
+      Storage.setLarge('dashboard_orders_cache', allOrders);
       setLoading(false);
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'orders'));
 
@@ -154,14 +169,17 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
     // Actually Firestores snapshot.size doesn't care about limit for total count of the query.
     
     const productCol = collection(db, 'products');
-    const qProducts = (isSeller && !isShowingGlobal) ? query(productCol, where('seller_id', '==', currentSellerId)) : productCol;
+    const qProducts = (isSeller && !isShowingGlobal) 
+      ? query(productCol, or(where('seller_id', '==', currentSellerId), where('seller', '==', currentSellerName)), limit(300)) 
+      : query(productCol, limit(500));
 
     const unsubscribeProducts = onSnapshot(qProducts, (snapshot) => {
       const pList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[];
       setProductsList(pList);
+      Storage.setLarge('dashboard_products_cache', pList);
       setStats(prev => {
         const updated = { ...prev, totalProducts: snapshot.size };
-        localStorage.setItem('dashboard_stats_cache', JSON.stringify(updated));
+        Storage.setSmall('dashboard_stats_cache', updated);
         return updated;
       });
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'products'));
@@ -185,7 +203,7 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
             totalUsers: usersSnap.size,
             totalSellers: sellersSnap.size
           };
-          localStorage.setItem('dashboard_stats_cache', JSON.stringify(updated));
+          Storage.setSmall('dashboard_stats_cache', updated);
           return updated;
         });
       } catch (err) {
@@ -343,7 +361,7 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
                 <button
                   onClick={() => {
                     if (isNoteEditing) {
-                      localStorage.setItem('dashboard_define_note', boardNote);
+                      Storage.setSmall('dashboard_define_note', boardNote);
                     }
                     setIsNoteEditing(!isNoteEditing);
                   }}

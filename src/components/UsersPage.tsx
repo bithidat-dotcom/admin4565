@@ -6,6 +6,7 @@ import Header from '../components/Header';
 import Modal from '../components/Modal';
 import { Users, Trash2, Loader2, Phone, MapPin, Mail, Calendar, Hash, ExternalLink, Package, Coins, ShieldCheck, Lock, Copy, Check, MessageSquare } from 'lucide-react';
 import { cn, formatCurrency } from '../lib/utils';
+import { Storage } from '../lib/storage';
 import { format } from 'date-fns';
 import { decryptData, encryptData } from '../lib/security';
 
@@ -56,6 +57,20 @@ export default function UsersPage({ onViewChange }: UsersPageProps) {
   useEffect(() => {
     setLoading(true);
     
+    // 0. Load cache for instant display
+    const loadCache = async () => {
+      const cachedUsers = await Storage.getLarge<User[]>('users_page_cache');
+      if (cachedUsers) {
+        setUsers(cachedUsers);
+      }
+      
+      const cachedOrders = await Storage.getLarge<Order[]>('users_orders_cache');
+      if (cachedOrders) {
+        setOrders(cachedOrders);
+      }
+    };
+    loadCache();
+
     // 1. Listen to registered users (limited)
     const unsubUsers = onSnapshot(query(collection(db, 'users'), limit(300)), (usersSnap) => {
       const usersList = usersSnap.docs
@@ -89,6 +104,7 @@ export default function UsersPage({ onViewChange }: UsersPageProps) {
         };
       }) as User[];
       setUsers(usersList);
+      Storage.setLarge('users_page_cache', usersList);
       setLoading(false);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'users');
@@ -111,6 +127,7 @@ export default function UsersPage({ onViewChange }: UsersPageProps) {
         };
       }) as Order[];
       setOrders(ordersList);
+      Storage.setLarge('users_orders_cache', ordersList);
     });
 
     return () => {

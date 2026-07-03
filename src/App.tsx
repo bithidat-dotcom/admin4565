@@ -13,8 +13,10 @@ import PopupAd from './components/PopupAd';
 import MobileNav from './components/MobileNav';
 import { View } from './types';
 import { motion, AnimatePresence } from 'motion/react';
-import { db } from './lib/firebase';
-import { collection, onSnapshot, query, where, getDocs, updateDoc, doc, limit, orderBy } from 'firebase/firestore';                
+import { db, handleFirestoreError, OperationType } from './lib/firebase';
+import { Storage } from './lib/storage';
+import { AlertCircle, WifiOff, X } from 'lucide-react';
+import { collection, onSnapshot, query, where, getDocs, updateDoc, doc, limit, orderBy } from 'firebase/firestore';
 
 export interface UserSession {
   role: 'admin' | 'seller';
@@ -47,25 +49,23 @@ export default function App() {
 
         if (!productName) continue;
 
-        // --- 1. REPAIR MISSING SELLER_ID ---
-        // If order was placed without seller_id, lookup from product and fix it
-        if (!orderData.seller_id) {
-          try {
-            const pQuery = query(collection(db, 'products'), where('name', '==', productName));
-            const pSnap = await getDocs(pQuery);
-            if (!pSnap.empty) {
-              const pData = pSnap.docs[0].data();
-              if (pData.seller_id) {
-                await updateDoc(doc(db, 'orders', orderId), {
-                  seller_id: pData.seller_id,
-                  seller: pData.seller || 'N/A'
-                });
-                console.log(`Repaired seller_id for order ${orderId} -> ${pData.seller_id}`);
-              }
+        // --- 1. FORCE CORRECT SELLER_ID ---
+        // Lookup from product and fix it, in case the frontend missed it or sent the wrong one
+        try {
+          const pQuery = query(collection(db, 'products'), where('name', '==', productName));
+          const pSnap = await getDocs(pQuery);
+          if (!pSnap.empty) {
+            const pData = pSnap.docs[0].data();
+            if (pData.seller_id && pData.seller_id !== orderData.seller_id) {
+              await updateDoc(doc(db, 'orders', orderId), {
+                seller_id: pData.seller_id,
+                seller: pData.seller || 'N/A'
+              });
+              console.log(`Forced seller_id for order ${orderId} -> ${pData.seller_id}`);
             }
-          } catch (e) {
-            console.error("Error repairing seller_id:", e);
           }
+        } catch (e) {
+          console.error("Error repairing seller_id:", e);
         }
 
         // --- 2. STOCK ADJUSTMENT ---
@@ -152,12 +152,16 @@ export default function App() {
   }, [isAuthenticated, userSession]);
 
   useEffect(() => {
-    const authStatus = localStorage.getItem('isAdminAuthenticated');
-    const sessionStr = localStorage.getItem('userSession');
+    const authStatus = Storage.getSmall<string>('isAdminAuthenticated');
+    const sessionStr = Storage.getSmall<string>('userSession');
     if (authStatus === 'true') {
       setIsAuthenticated(true);
       if (sessionStr) {
-        setUserSession(JSON.parse(sessionStr));
+        try {
+          setUserSession(typeof sessionStr === 'string' ? JSON.parse(sessionStr) : sessionStr);
+        } catch {
+          setUserSession({ role: 'admin' });
+        }
       } else {
         setUserSession({ role: 'admin' });
       }
@@ -179,20 +183,16 @@ export default function App() {
   const handleLogin = (session: UserSession) => {
     setIsAuthenticated(true);
     setUserSession(session);
-    localStorage.setItem('isAdminAuthenticated', 'true');
-    localStorage.setItem('userSession', JSON.stringify(session));
+    Storage.setSmall('isAdminAuthenticated', 'true');
+    Storage.setSmall('userSession', JSON.stringify(session));
   };
 
   const handleLogout = () => {
     setIsAuthenticated(false);
     setUserSession(null);
-    localStorage.removeItem('isAdminAuthenticated');
-    localStorage.removeItem('userSession');
+    Storage.removeSmall('isAdminAuthenticated');
+    Storage.removeSmall('userSession');
   };
-
-  if (!isAuthenticated) {
-    return <LoginPage onLogin={handleLogin} />;
-  }
 
   const renderView = () => {
     const isSeller = userSession?.role === 'seller';
@@ -246,39 +246,51 @@ export default function App() {
     }
   };
 
-  return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-brand-light selection:text-brand-dark">
-      <PopupAd />                
-      <Sidebar 
-        currentView={currentView} 
-        onViewChange={setCurrentView} 
-        isOpen={isSidebarOpen}
-        onClose={() => setIsSidebarOpen(false)}
-        onLogout={handleLogout}
-        userSession={userSession}
-      />
-      
-      <div className="md:pl-64 pl-0 min-h-screen flex flex-col pb-20 md:pb-0">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={currentView}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.2 }}
-            className="flex-1 flex flex-col"
-          >
-            {renderView()}
-          </motion.div>
-        </AnimatePresence>
+  const renderMainContent = () => {
+    if (!isAuthenticated) {
+      return <LoginPage onLogin={handleLogin} />;
+    }
+
+    return (
+      <div className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-brand-light selection:text-brand-dark">
+        <PopupAd />                
+        <Sidebar 
+          currentView={currentView} 
+          onViewChange={setCurrentView} 
+          isOpen={isSidebarOpen}
+          onClose={() => setIsSidebarOpen(false)}
+          onLogout={handleLogout}
+          userSession={userSession}
+        />
+        
+        <div className="md:pl-64 pl-0 min-h-screen flex flex-col pb-20 md:pb-0">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentView}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+              className="flex-1 flex flex-col"
+            >
+              {renderView()}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+
+        <MobileNav currentView={currentView} onViewChange={setCurrentView} />
+
+        <LinkConverterModal 
+          isOpen={isGlobalConverterOpen} 
+          onClose={() => setIsGlobalConverterOpen(false)} 
+        />
       </div>
+    );
+  };
 
-      <MobileNav currentView={currentView} onViewChange={setCurrentView} />
-
-      <LinkConverterModal 
-        isOpen={isGlobalConverterOpen} 
-        onClose={() => setIsGlobalConverterOpen(false)} 
-      />
-    </div>
+  return (
+    <>
+      {renderMainContent()}
+    </>
   );
 }

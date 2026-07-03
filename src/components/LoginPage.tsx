@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../lib/firebase';
 import { collection, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
-import { Loader2, Store, ShieldCheck, UserPlus, LogIn, ChevronRight, Phone } from 'lucide-react';
+import { Loader2, Store, ShieldCheck, UserPlus, LogIn, ChevronRight, Phone, Eye, EyeOff, Lock } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Seller } from '../types';
 import ImageUploader from './ImageUploader';
@@ -22,6 +22,10 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   const [password, setPassword] = useState('');
   const [pin, setPin] = useState('');
   const [sellerIdInput, setSellerIdInput] = useState('');
+  const [sellerPasswordInput, setSellerPasswordInput] = useState('');
+  const [showAdminPass, setShowAdminPass] = useState(false);
+  const [showSellerPass, setShowSellerPass] = useState(false);
+  const [showRegPass, setShowRegPass] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -29,6 +33,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   const [regData, setRegData] = useState({
     name: '',
     seller_id: '',
+    password: '',
     logo: '',
     whatsapp_number: '',
     email: ''
@@ -36,7 +41,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
 
   const handleAdminLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (password === 'Correct-Horse-Battery-Staple-Quats-2026!' && pin === '4565') {
+    if (password === 'Admin2026!' && pin === '4565') {
       onLogin({ role: 'admin' });
     } else {
       setError('Invalid admin credentials');
@@ -56,6 +61,20 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
 
       if (!snap.empty) {
         const sellerData = snap.docs[0].data() as Seller;
+        
+        // Safety check for password - MANDATORY for all sellers now
+        if (!sellerData.password) {
+          setError('Account has no security password. Please contact admin.');
+          setLoading(false);
+          return;
+        }
+
+        if (sellerData.password !== sellerPasswordInput) {
+          setError('Invalid password. Access denied.');
+          setLoading(false);
+          return;
+        }
+
         onLogin({ role: 'seller', name: sellerData.name, sellerId: sellerData.seller_id });
       } else {
         setError('Seller ID not found. Please register first.');
@@ -70,8 +89,8 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!regData.name || !regData.seller_id || !regData.whatsapp_number) {
-      setError('Please fill all required fields');
+    if (!regData.name || !regData.seller_id || !regData.whatsapp_number || !regData.password) {
+      setError('Please fill all required fields (including password)');
       return;
     }
 
@@ -155,14 +174,23 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                     <form onSubmit={handleAdminLogin} className="space-y-4">
                         <div className="space-y-1.5">
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Root Password</label>
-                            <input
-                                type="password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                placeholder="Root Password"
-                                required
-                                className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-brand focus:border-transparent outline-none transition-all font-mono"
-                            />
+                            <div className="relative">
+                                <input
+                                    type={showAdminPass ? "text" : "password"}
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    placeholder="Root Password"
+                                    required
+                                    className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-brand focus:border-transparent outline-none transition-all font-mono"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowAdminPass(!showAdminPass)}
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                                >
+                                    {showAdminPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                </button>
+                            </div>
                         </div>
                         <div className="space-y-1.5">
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Secure PIN</label>
@@ -199,6 +227,26 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                                 required
                                 className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-brand focus:border-transparent outline-none transition-all font-black uppercase tracking-widest text-[#6366f1]"
                             />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Safety Password</label>
+                            <div className="relative">
+                                <input
+                                    type={showSellerPass ? "text" : "password"}
+                                    value={sellerPasswordInput}
+                                    onChange={(e) => setSellerPasswordInput(e.target.value)}
+                                    placeholder="Enter password"
+                                    required
+                                    className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-brand focus:border-transparent outline-none transition-all"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowSellerPass(!showSellerPass)}
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                                >
+                                    {showSellerPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                </button>
+                            </div>
                         </div>
                         {error && <p className="text-rose-500 text-[10px] font-black uppercase tracking-wider text-center bg-rose-50 p-2 rounded-lg">{error}</p>}
                         <button
@@ -240,6 +288,26 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                                     className="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-black uppercase tracking-widest text-indigo-600 outline-none focus:border-brand"
                                 />
                                 <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wider pl-1">This will be your permanent login key</p>
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Safety Password</label>
+                                <div className="relative">
+                                    <input
+                                        type={showRegPass ? "text" : "password"}
+                                        required
+                                        value={regData.password}
+                                        onChange={e => setRegData({...regData, password: e.target.value})}
+                                        placeholder="Minimum 6 characters"
+                                        className="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-bold outline-none focus:border-brand"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowRegPass(!showRegPass)}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                                    >
+                                        {showRegPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                    </button>
+                                </div>
                             </div>
                             <div className="space-y-1.5">
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">WhatsApp Number</label>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { doc, onSnapshot, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { Storage } from '../lib/storage';
 import { motion, AnimatePresence } from 'motion/react';
 import { X } from 'lucide-react';
 import { Banner } from '../types';
@@ -24,7 +25,7 @@ export default function PopupAd() {
         if (adData.isActive && adData.bannerId) {
           // If the banner ID changed, or it hasn't been seen yet
           const seenKey = `popupSeen_${adData.bannerId}`;
-          const hasSeen = localStorage.getItem(seenKey);
+          const hasSeen = Storage.getSmall(seenKey);
 
           if (adData.bannerId !== currentAdId || !hasSeen) {
             const bannerDoc = await getDoc(doc(db, 'banners', adData.bannerId));
@@ -32,7 +33,7 @@ export default function PopupAd() {
               setBanner({ id: bannerDoc.id, ...bannerDoc.data() } as Banner);
               setCurrentAdId(adData.bannerId);
               setShow(true);
-              localStorage.setItem(seenKey, 'true');
+              Storage.setSmall(seenKey, 'true');
               
               // Auto-hide after 3 seconds as requested
               setTimeout(() => {

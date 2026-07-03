@@ -11,7 +11,13 @@ interface HeaderProps {
 
 export default function Header({ title, onAction, actionLabel, onSearch, children }: HeaderProps) {
   const handleMenuClick = () => {
-    window.dispatchEvent(new CustomEvent('open-sidebar'));
+    try {
+      window.dispatchEvent(new CustomEvent('open-sidebar'));
+    } catch (e) {
+      const event = document.createEvent('CustomEvent');
+      event.initCustomEvent('open-sidebar', true, true, {});
+      window.dispatchEvent(event);
+    }
   };
 
   return (

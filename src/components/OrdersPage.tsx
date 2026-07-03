@@ -8,6 +8,7 @@ import OrderTableView from './OrderTableView';
 import LoadingDots from './LoadingDots';
 import { Loader2, Phone, MapPin, Package, Clock, CheckCircle, Search, Trash2, ShieldCheck, Lock, Copy, Check, MessageSquare, Store, ShoppingBag, Truck, Coins, Printer, MoreVertical } from 'lucide-react';
 import { formatCurrency, cn, exportToCSV } from '../lib/utils';
+import { Storage } from '../lib/storage';
 import { format, isSameDay } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
 import { Calendar } from 'lucide-react';
@@ -51,6 +52,20 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
   const [sellerSearch, setSellerSearch] = useState('');
 
   useEffect(() => {
+    // 0. Load cache for instant display
+    const loadCache = async () => {
+      const cachedOrders = await Storage.getLarge<Order[]>('orders_page_cache');
+      if (cachedOrders && !isSeller && !sellerSearch) {
+        setOrders(cachedOrders);
+      }
+      
+      const cachedSellers = Storage.getSmall<Record<string, any>>('sellers_map_cache');
+      if (cachedSellers) {
+        setSellers(cachedSellers);
+      }
+    };
+    loadCache();
+
     // 1. Listen to limited set of recent orders (quota saving)
     let q;
     if (isSeller) {
@@ -60,8 +75,7 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
           where('seller_id', '==', currentSellerId),
           where('seller', '==', currentSellerName)
         ),
-        orderBy('created_at', 'desc'), 
-        limit(300)
+        limit(500)
       );
     } else if (sellerSearch.trim()) {
       // Admin searching for specific seller orders
@@ -69,19 +83,15 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
       const searchLower = search.toLowerCase();
       q = query(
         collection(db, 'orders'),
-        or(
-          where('seller_id', '==', searchLower),
-          where('seller', '==', search)
-        ),
-        orderBy('created_at', 'desc'),
-        limit(300)
+        where('seller_id', '==', searchLower),
+        limit(500)
       );
     } else {
-      q = query(collection(db, 'orders'), orderBy('created_at', 'desc'), limit(300));
+      q = query(collection(db, 'orders'), limit(1000));
     }
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const ordersData = snapshot.docs.map(doc => {
+      let ordersData = snapshot.docs.map(doc => {
         const rawData = doc.data();
         return {
           id: doc.id,
@@ -90,11 +100,17 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
           whatsapp_number: decryptData(rawData.whatsapp_number),
           location: decryptData(rawData.location),
           product_details: decryptData(rawData.product_details),
-          created_at: rawData.created_at?.toDate?.()?.toISOString() || new Date().toISOString()
+          created_at: rawData.created_at?.toDate?.()?.toISOString() || rawData.created_at || new Date().toISOString()
         };
       }) as Order[];
       
+      // Client-side sort since we removed orderBy for index-free where queries
+      ordersData.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      
       setOrders(ordersData);
+      if (!isSeller && !sellerSearch) {
+        Storage.setLarge('orders_page_cache', ordersData);
+      }
       setLoading(false);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'orders');
@@ -110,6 +126,7 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
           sellersMap[doc.data().name] = { id: doc.id, ...doc.data() };
         });
         setSellers(sellersMap);
+        Storage.setSmall('sellers_map_cache', sellersMap);
       } catch (err) {
         console.warn("Failed to fetch sellers map, might be quota issue:", err);
       }
@@ -541,7 +558,7 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
                                 </div>
                                 <div className="text-right">
                                   <p className="text-[10px] font-black text-white/30 uppercase tracking-widest mb-1">Subtotal</p>
-                                  <p className="text-3xl font-black text-white tracking-tighter">৳{order.price.toLocaleString()}</p>
+                                  <p className="text-3xl font-black text-white tracking-tighter">৳{(order.price || 0).toLocaleString()}</p>
                                 </div>
                               </div>
                               

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc, Timestamp, writeBatch, getDocs, serverTimestamp, limit, where } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc, Timestamp, writeBatch, getDocs, serverTimestamp, limit, where, or } from 'firebase/firestore';
 import { Product, Seller } from '../types';
 import Header from '../components/Header';
 import Modal from '../components/Modal';
@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import ImageUploader from './ImageUploader';
 import { formatCurrency, cn } from '../lib/utils';
+import { Storage } from '../lib/storage';
 
 interface ProductsPageProps {
   defaultCategory?: string;
@@ -163,10 +164,12 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
     discountType: 'permanent' as 'permanent' | 'timer',
     seller_id: '',
     is_super_sale: false,
-    is_seller_creation: isSeller
+    is_seller_creation: isSeller,
+    extra_categories: [] as string[]
   });
 
   const [newImageUrl, setNewImageUrl] = useState('');
+  const [newExtraCategory, setNewExtraCategory] = useState('');
   const [filterName, setFilterName] = useState('');
   const [filterCategory, setFilterCategory] = useState(defaultCategory);
 
@@ -181,7 +184,9 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
   }, [filterCategory, onCategoryFilterChange]);
 
   const filteredProducts = products.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(filterName.toLowerCase());
+    const searchLower = filterName.toLowerCase();
+    const matchesSearch = product.name.toLowerCase().includes(searchLower) || 
+                          product.extra_categories?.some(cat => cat.toLowerCase().includes(searchLower));
     const matchesCategory = filterCategory === 'All' || product.category === filterCategory;
     const matchesSuperSell = filterCategory === 'Super Sale' ? product.is_super_sale : true;
     
@@ -193,27 +198,49 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
   });
 
   useEffect(() => {
+    // Load cache
+    const loadCache = async () => {
+      const cachedProducts = await Storage.getLarge<Product[]>('products_page_cache');
+      if (cachedProducts && !isSeller) {
+        setProducts(cachedProducts);
+      }
+      
+      const cachedSellers = await Storage.getLarge<Seller[]>('sellers_list_cache');
+      if (cachedSellers) {
+        setSellers(cachedSellers);
+      }
+    };
+    loadCache();
+
     // Limited query to save quota
     let q;
-    if (isSeller && currentSellerId) {
+    if (isSeller && (currentSellerId || currentSellerName)) {
       q = query(
         collection(db, 'products'), 
-        where('seller_id', '==', currentSellerId),
-        orderBy('created_at', 'desc'), 
+        or(
+          where('seller_id', '==', currentSellerId),
+          where('seller', '==', currentSellerName)
+        ),
         limit(500)
       );
     } else {
-      q = query(collection(db, 'products'), orderBy('created_at', 'desc'), limit(500));
+      q = query(collection(db, 'products'), limit(1000));
     }
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const productsData = snapshot.docs.map(doc => ({
+      let productsData = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
-        created_at: doc.data().created_at?.toDate?.()?.toISOString() || new Date().toISOString()
+        created_at: doc.data().created_at?.toDate?.()?.toISOString() || doc.data().created_at || new Date().toISOString()
       })) as Product[];
       
+      // Client-side sort to ensure all items show even if they are missing fields required for server-side index
+      productsData.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      
       setProducts(productsData);
+      if (!isSeller) {
+        Storage.setLarge('products_page_cache', productsData);
+      }
       setLoading(false);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'products');
@@ -233,6 +260,7 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
           ...doc.data()
         })) as Seller[];
         setSellers(sellersData);
+        Storage.setLarge('sellers_list_cache', sellersData);
       } catch (err) {
          console.warn("Failed fetch of sellers in ProductsPage, might be quota issue:", err);
       }
@@ -270,10 +298,12 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
       },
       discountExpiresAt: '',
       discountType: 'permanent',
-      is_super_sale: false
+      is_super_sale: false,
+      extra_categories: []
     });
     setEditingProduct(null);
     setNewImageUrl('');
+    setNewExtraCategory('');
   };
 
   const handleOpenAddModal = () => {
@@ -314,7 +344,8 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
       },
       discountExpiresAt: product.discountExpiresAt || '',
       discountType: product.discountExpiresAt ? 'timer' : 'permanent',
-      is_super_sale: product.is_super_sale || false
+      is_super_sale: product.is_super_sale || false,
+      extra_categories: product.extra_categories || []
     });
     setIsModalOpen(true);
   };
@@ -332,12 +363,18 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
   const executeDeleteProduct = async () => {
     if (!productToDelete) return;
     const id = productToDelete;
-    setProductToDelete(null);
     setDeletingId(id);
     try {
       await deleteDoc(doc(db, 'products', id));
+      setProductToDelete(null);
     } catch (err) {
-      handleFirestoreError(err, OperationType.DELETE, `products/${id}`);
+      console.error("Delete failed:", err);
+      if (err instanceof Error && err.message.includes("QUOTA_EXCEEDED")) {
+        alert("Daily limit reached. Cannot delete right now. Please try again tomorrow.");
+      } else {
+        alert("Failed to delete product. Please check your connection.");
+      }
+      // Don't close modal on error so user can retry or see what happened
     } finally {
       setDeletingId(null);
     }
@@ -376,6 +413,23 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
     if (!newImageUrl) return;
     setFormData(prev => ({ ...prev, images: [...prev.images, newImageUrl] }));
     setNewImageUrl('');
+  };
+
+  const addExtraCategory = () => {
+    if (!newExtraCategory.trim()) return;
+    if (formData.extra_categories.includes(newExtraCategory.trim())) {
+      setNewExtraCategory('');
+      return;
+    }
+    setFormData(prev => ({ ...prev, extra_categories: [...prev.extra_categories, newExtraCategory.trim()] }));
+    setNewExtraCategory('');
+  };
+
+  const removeExtraCategory = (cat: string) => {
+    setFormData(prev => ({
+      ...prev,
+      extra_categories: prev.extra_categories.filter(c => c !== cat)
+    }));
   };
 
   const removeExtraImage = (index: number) => {
@@ -419,6 +473,7 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
         amp: formData.gadgetSpecs.amp || ''
       } : null,
       is_super_sale: formData.is_super_sale,
+      extra_categories: formData.extra_categories,
       discountExpiresAt: (parseFloat(formData.discount) > 0 && formData.discountType === 'timer') ? formData.discountExpiresAt : ''
     };
 
@@ -676,7 +731,14 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
                 </div>
 
                 <div className="p-5">
-                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">SKU: {product.id.slice(0, 8)}</div>
+                  <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">SKU: {product.id.slice(0, 8)}</div>
+                    {product.extra_categories && product.extra_categories.length > 0 && product.extra_categories.map((cat, i) => (
+                      <span key={i} className="text-[8px] font-black bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded uppercase tracking-tighter border border-indigo-100/50">
+                        {cat}
+                      </span>
+                    ))}
+                  </div>
                   <h3 className="font-bold text-slate-900 line-clamp-1 text-sm uppercase">{product.name}</h3>
                   <div className="flex justify-between items-center mt-2">
                       <span className="font-black text-brand text-sm">{formatCurrency(product.price)}</span>
@@ -978,6 +1040,57 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
                 {formData.is_super_sale ? 'Active Super Sale' : 'Mark Super Sale'}
               </button>
             </div>
+          </div>
+
+          <div className="bg-indigo-50/30 p-5 rounded-2xl border border-indigo-100/50 space-y-4">
+            <div className="flex items-center gap-2">
+              <Layers className="w-4 h-4 text-indigo-600" />
+              <h4 className="text-[11px] font-black uppercase tracking-widest text-indigo-700">Extra Categories / Tags</h4>
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newExtraCategory}
+                onChange={e => setNewExtraCategory(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addExtraCategory();
+                  }
+                }}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-white border border-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-xs font-medium"
+                placeholder="Type additional category (e.g. New Arrival, Offer)..."
+              />
+              <button
+                type="button"
+                onClick={addExtraCategory}
+                disabled={!newExtraCategory.trim()}
+                className="px-4 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all disabled:opacity-50 disabled:grayscale"
+              >
+                Add Tag
+              </button>
+            </div>
+            
+            {formData.extra_categories.length > 0 && (
+              <div className="flex flex-wrap gap-2 pt-1">
+                {formData.extra_categories.map((cat, idx) => (
+                  <span 
+                    key={idx} 
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-indigo-200 text-indigo-600 text-[9px] font-black uppercase tracking-widest rounded-lg shadow-sm"
+                  >
+                    {cat}
+                    <button 
+                      type="button" 
+                      onClick={() => removeExtraCategory(cat)}
+                      className="hover:text-red-500 transition-colors"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tight">Adding extra categories helps in custom filtering and discovery sections.</p>
           </div>
 
           <div className="space-y-3">
@@ -1449,9 +1562,14 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
           <div className="flex gap-4">
             <button
               onClick={executeDeleteProduct}
-              className="flex-1 py-3.5 bg-red-500 hover:bg-red-600 active:scale-98 transition-all text-white text-xs font-black uppercase tracking-widest rounded-xl shadow-lg shadow-red-100 cursor-pointer"
+              disabled={deletingId !== null}
+              className={cn(
+                "flex-1 py-3.5 flex items-center justify-center gap-2 text-white text-xs font-black uppercase tracking-widest rounded-xl shadow-lg transition-all active:scale-98 cursor-pointer",
+                deletingId !== null ? "bg-red-400 cursor-not-allowed" : "bg-red-500 hover:bg-red-600 shadow-red-100"
+              )}
             >
-              Yes, Delete
+              {deletingId !== null && <Loader2 className="w-4 h-4 animate-spin" />}
+              {deletingId !== null ? 'Deleting...' : 'Yes, Delete'}
             </button>
             <button
               onClick={() => setProductToDelete(null)}

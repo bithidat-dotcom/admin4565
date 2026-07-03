@@ -21,6 +21,7 @@
     "express": "^4.21.2",
     "firebase": "^12.13.0",
     "html2canvas": "^1.4.1",
+    "idb-keyval": "^6.2.6",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
     "lucide-react": "^0.546.0",
