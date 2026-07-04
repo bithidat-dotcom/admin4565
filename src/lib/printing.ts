@@ -116,8 +116,8 @@ export const handlePrint = async (order: Order) => {
   pdf.text("Sub-total:", 135, finalY + 5);
   pdf.text(formatCurrency((Number(order.quantity) || 1) * order.price), 195, finalY + 5, { align: 'right' });
 
-  pdf.text("Logistics Fee:", 135, finalY + 12);
-  pdf.text("৳0.00", 195, finalY + 12, { align: 'right' });
+  pdf.text("Delivery Charge:", 135, finalY + 12);
+  pdf.text(formatCurrency(order.delivery_charge || 120), 195, finalY + 12, { align: 'right' });
 
   pdf.text("Admin Adjust:", 135, finalY + 19);
   pdf.text("- ৳0.00", 195, finalY + 19, { align: 'right' });
@@ -125,7 +125,8 @@ export const handlePrint = async (order: Order) => {
   pdf.setFont('helvetica', 'bold');
   pdf.text("GRAND TOTAL:", 135, finalY + 28);
   pdf.setTextColor(249, 115, 22);
-  pdf.text(formatCurrency((Number(order.quantity) || 1) * order.price), 195, finalY + 28, { align: 'right' });
+  const grandTotal = ((Number(order.quantity) || 1) * order.price) + (order.delivery_charge || 120);
+  pdf.text(formatCurrency(grandTotal), 195, finalY + 28, { align: 'right' });
 
   // Footer Signature
   const footerY = 280;

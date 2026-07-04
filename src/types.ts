@@ -48,6 +48,7 @@ export interface Order {
   seller_logo?: string;
   seller_whatsapp?: string;
   user_id?: string;
+  delivery_charge?: number;
   cancelled_by?: 'user' | 'admin';
   status: 'pending' | 'confirmed' | 'packing' | 'shipping' | 'delivered' | 'completed' | 'cancelled';
   created_at: string;

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, onSnapshot, query, orderBy, updateDoc, deleteDoc, doc, where, getDocs, limit, or } from 'firebase/firestore';
-import { Order } from '../types';
+import { collection, onSnapshot, query, orderBy, updateDoc, deleteDoc, doc, where, getDocs, limit, or, addDoc, serverTimestamp } from 'firebase/firestore';
+import { Order, Product } from '../types';
 import Header from '../components/Header';
 import Modal from './Modal';
 import OrderTableView from './OrderTableView';
@@ -37,6 +37,17 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
   const [otpError, setOtpError] = useState<string>('');
   const [isTableView, setIsTableView] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [newOrderData, setNewOrderData] = useState({
+    customer_name: '',
+    whatsapp_number: '',
+    location: '',
+    product_id: '',
+    quantity: 1,
+    delivery_charge: 120
+  });
+  const [submittingOrder, setSubmittingOrder] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [sellers, setSellers] = useState<Record<string, any>>({});
 
@@ -132,6 +143,17 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
       }
     };
     fetchSellers();
+
+    const fetchProducts = async () => {
+      try {
+        const q = query(collection(db, 'products'), limit(500));
+        const snapshot = await getDocs(q);
+        setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Product));
+      } catch (err) {
+        console.warn("Failed to fetch products for order creation:", err);
+      }
+    };
+    fetchProducts();
 
     return () => {
       unsubscribe();
@@ -304,6 +326,53 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
     }
   };
 
+  const handleCreateOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmittingOrder(true);
+
+    const selectedProduct = products.find(p => p.id === newOrderData.product_id);
+    if (!selectedProduct) {
+      alert("Please select a valid product");
+      setSubmittingOrder(false);
+      return;
+    }
+
+    try {
+      const orderPayload = {
+        customer_name: encryptData(newOrderData.customer_name),
+        whatsapp_number: encryptData(newOrderData.whatsapp_number),
+        location: encryptData(newOrderData.location),
+        product_details: encryptData(selectedProduct.name),
+        product_name: selectedProduct.name,
+        product_image: selectedProduct.image,
+        price: selectedProduct.price,
+        quantity: newOrderData.quantity,
+        delivery_charge: newOrderData.delivery_charge,
+        status: 'pending',
+        seller: isSeller ? currentSellerName : (selectedProduct.seller || 'pbazar Official'),
+        seller_id: isSeller ? currentSellerId : (selectedProduct.seller_id || ''),
+        seller_logo: selectedProduct.seller_logo || '',
+        seller_whatsapp: selectedProduct.seller_whatsapp || '',
+        created_at: serverTimestamp()
+      };
+
+      await addDoc(collection(db, 'orders'), orderPayload);
+      setIsAddModalOpen(false);
+      setNewOrderData({
+        customer_name: '',
+        whatsapp_number: '',
+        location: '',
+        product_id: '',
+        quantity: 1,
+        delivery_charge: 120
+      });
+    } catch (err: any) {
+      handleFirestoreError(err, OperationType.CREATE, 'orders');
+    } finally {
+      setSubmittingOrder(false);
+    }
+  };
+
   const getStatusColor = (status: Order['status']) => {
     switch (status) {
       case 'pending': return 'bg-amber-100 text-amber-700';
@@ -319,7 +388,12 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
 
   return (
     <div className="flex-1 overflow-x-hidden pb-24 md:pb-0">
-      <Header title="Orders" onSearch={setSearchQuery} />
+      <Header 
+        title="Orders" 
+        onAction={() => setIsAddModalOpen(true)}
+        actionLabel="New Order"
+        onSearch={setSearchQuery} 
+      />
 
       <main className="p-4 md:p-8">
         {/* Quick Stats Summary Box */}
@@ -557,8 +631,11 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
                                   </div>
                                 </div>
                                 <div className="text-right">
-                                  <p className="text-[10px] font-black text-white/30 uppercase tracking-widest mb-1">Subtotal</p>
-                                  <p className="text-3xl font-black text-white tracking-tighter">৳{(order.price || 0).toLocaleString()}</p>
+                                  <p className="text-[10px] font-black text-white/30 uppercase tracking-widest mb-1">Grand Total</p>
+                                  <p className="text-3xl font-black text-white tracking-tighter">৳{((order.price || 0) * (Number(order.quantity) || 1) + (order.delivery_charge || 120)).toLocaleString()}</p>
+                                  {order.delivery_charge && order.delivery_charge !== 0 && (
+                                    <p className="text-[8px] text-white/40 font-bold uppercase mt-1">Inc. ৳{order.delivery_charge} Delivery</p>
+                                  )}
                                 </div>
                               </div>
                               
@@ -721,6 +798,98 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
             Resend OTP Code
           </button>
         </div>
+      </Modal>
+
+      <Modal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        title="Create Manual Order"
+      >
+        <form onSubmit={handleCreateOrder} className="space-y-4">
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Customer Name</label>
+            <input
+              required
+              type="text"
+              value={newOrderData.customer_name}
+              onChange={e => setNewOrderData({...newOrderData, customer_name: e.target.value})}
+              className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-brand text-xs font-bold"
+              placeholder="Full Name"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">WhatsApp Number</label>
+            <input
+              required
+              type="tel"
+              value={newOrderData.whatsapp_number}
+              onChange={e => setNewOrderData({...newOrderData, whatsapp_number: e.target.value})}
+              className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-brand text-xs font-bold"
+              placeholder="e.g. 01700000000"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Shipping Location</label>
+            <textarea
+              required
+              value={newOrderData.location}
+              onChange={e => setNewOrderData({...newOrderData, location: e.target.value})}
+              className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-brand text-xs font-bold"
+              placeholder="Full Address"
+              rows={2}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Product</label>
+              <select
+                required
+                value={newOrderData.product_id}
+                onChange={e => setNewOrderData({...newOrderData, product_id: e.target.value})}
+                className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-brand text-xs font-bold"
+              >
+                <option value="">Select Product</option>
+                {products.map(p => (
+                  <option key={p.id} value={p.id}>{p.name} - {formatCurrency(p.price)}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Quantity</label>
+              <input
+                required
+                type="number"
+                min="1"
+                value={newOrderData.quantity}
+                onChange={e => setNewOrderData({...newOrderData, quantity: parseInt(e.target.value)})}
+                className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-brand text-xs font-bold"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Delivery Charge (৳)</label>
+            <input
+              required
+              type="number"
+              value={newOrderData.delivery_charge}
+              onChange={e => setNewOrderData({...newOrderData, delivery_charge: parseFloat(e.target.value)})}
+              className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-brand text-xs font-bold"
+            />
+            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-tight">Default is 120 Taka</p>
+          </div>
+
+          <button
+            type="submit"
+            disabled={submittingOrder}
+            className="w-full py-4 bg-brand hover:bg-brand-dark text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-brand/20 disabled:opacity-50"
+          >
+            {submittingOrder ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Create Manual Order'}
+          </button>
+        </form>
       </Modal>
 
       <Modal

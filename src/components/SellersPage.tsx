@@ -54,7 +54,6 @@ export default function SellersPage({ userSession }: SellersPageProps) {
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   const [searchTerm, setSearchTerm] = useState('');
   const [verificationFilter, setVerificationFilter] = useState<'all' | 'verified' | 'unverified'>('all');
-  const [showPassword, setShowPassword] = useState(false);
 
   // Active dashboard analysis context
   const [selectedDashboardSeller, setSelectedDashboardSeller] = useState<Seller | null>(null);
@@ -62,7 +61,6 @@ export default function SellersPage({ userSession }: SellersPageProps) {
   const [formData, setFormData] = useState({
     seller_id: '',
     name: '',
-    password: '',
     logo: '',
     whatsapp_number: '',
     email: '',
@@ -126,7 +124,6 @@ export default function SellersPage({ userSession }: SellersPageProps) {
     setFormData({
       seller_id: '',
       name: '',
-      password: '',
       logo: '',
       whatsapp_number: '',
       email: '',
@@ -152,7 +149,6 @@ export default function SellersPage({ userSession }: SellersPageProps) {
     setFormData({
       seller_id: seller.seller_id || '',
       name: seller.name,
-      password: seller.password || '',
       logo: seller.logo,
       whatsapp_number: seller.whatsapp_number || '',
       email: seller.email || '',
@@ -643,27 +639,6 @@ export default function SellersPage({ userSession }: SellersPageProps) {
                 className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-brand text-xs font-bold uppercase tracking-tight text-slate-800"
                 placeholder="e.g. Trendy BD Co."
               />
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Safety Password</label>
-            <div className="relative">
-              <input
-                required
-                type={showPassword ? "text" : "password"}
-                value={formData.password}
-                onChange={e => setFormData({ ...formData, password: e.target.value })}
-                className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-brand text-xs font-bold text-slate-700"
-                placeholder="Partner login password"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 transition-colors"
-              >
-                {showPassword ? <Lock className="w-3.5 h-3.5" /> : <ShieldCheck className="w-3.5 h-3.5" />}
-              </button>
             </div>
           </div>
 

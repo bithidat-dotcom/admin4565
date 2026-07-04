@@ -37,6 +37,7 @@ export default function OrderTableView({ orders, onStatusChange, statusUpdatingI
               <th className="px-3 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest">Product</th>
               <th className="px-3 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest">Qty</th>
               <th className="px-3 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest">Seller</th>
+              <th className="px-3 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">Total</th>
               <th className="px-3 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest">Status</th>
               <th className="px-3 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">Actions</th>
             </tr>
@@ -66,6 +67,10 @@ export default function OrderTableView({ orders, onStatusChange, statusUpdatingI
                 <td className="px-3 py-4">
                    <div className="text-xs font-bold text-slate-800 line-clamp-1">{order.seller || 'N/A'}</div>
                    {order.seller_id && <div className="text-[9px] text-indigo-500 font-bold uppercase tracking-tight">ID: {order.seller_id}</div>}
+                </td>
+                <td className="px-3 py-4 text-right">
+                   <div className="text-xs font-black text-slate-900">{formatCurrency(((order.price || 0) * (Number(order.quantity) || 1)) + (order.delivery_charge || 120))}</div>
+                   <div className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter">Inc. ৳{order.delivery_charge || 120} Del</div>
                 </td>
                 <td className="px-3 py-4">
                    <select 
