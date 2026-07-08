@@ -7,6 +7,7 @@ import BannersPage from './components/BannersPage';
 import ReviewsPage from './components/ReviewsPage';
 import UsersPage from './components/UsersPage';
 import SellersPage from './components/SellersPage';
+import SettingsPage from './components/SettingsPage';
 import LoginPage from './components/LoginPage';
 import LinkConverterModal from './components/LinkConverterModal';
 import PopupAd from './components/PopupAd';
@@ -17,6 +18,7 @@ import { db, handleFirestoreError, OperationType } from './lib/firebase';
 import { Storage } from './lib/storage';
 import { AlertCircle, WifiOff, X } from 'lucide-react';
 import { collection, onSnapshot, query, where, getDocs, updateDoc, doc, limit, orderBy } from 'firebase/firestore';
+import { cn } from './lib/utils';
 
 export interface UserSession {
   role: 'admin' | 'seller';
@@ -31,6 +33,20 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [filterCategory, setFilterCategory] = useState('All');
   const [isGlobalConverterOpen, setIsGlobalConverterOpen] = useState(false);
+  const [theme, setTheme] = useState<'light' | 'soft' | 'slate'>('light');
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('app-theme') as any;
+    if (savedTheme) setTheme(savedTheme || 'light');
+
+    const handleThemeChange = () => {
+      const newTheme = localStorage.getItem('app-theme') as any;
+      if (newTheme) setTheme(newTheme);
+    };
+
+    window.addEventListener('theme-change', handleThemeChange);
+    return () => window.removeEventListener('theme-change', handleThemeChange);
+  }, []);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -51,21 +67,23 @@ export default function App() {
 
         // --- 1. FORCE CORRECT SELLER_ID ---
         // Lookup from product and fix it, in case the frontend missed it or sent the wrong one
-        try {
-          const pQuery = query(collection(db, 'products'), where('name', '==', productName));
-          const pSnap = await getDocs(pQuery);
-          if (!pSnap.empty) {
-            const pData = pSnap.docs[0].data();
-            if (pData.seller_id && pData.seller_id !== orderData.seller_id) {
-              await updateDoc(doc(db, 'orders', orderId), {
-                seller_id: pData.seller_id,
-                seller: pData.seller || 'N/A'
-              });
-              console.log(`Forced seller_id for order ${orderId} -> ${pData.seller_id}`);
+        if (!orderData.seller_id) {
+          try {
+            const pQuery = query(collection(db, 'products'), where('name', '==', productName));
+            const pSnap = await getDocs(pQuery);
+            if (!pSnap.empty) {
+              const pData = pSnap.docs[0].data();
+              if (pData.seller_id && pData.seller_id !== orderData.seller_id) {
+                await updateDoc(doc(db, 'orders', orderId), {
+                  seller_id: pData.seller_id,
+                  seller: pData.seller || 'N/A'
+                });
+                console.log(`Forced seller_id for order ${orderId} -> ${pData.seller_id}`);
+              }
             }
+          } catch (e) {
+            console.error("Error repairing seller_id:", e);
           }
-        } catch (e) {
-          console.error("Error repairing seller_id:", e);
         }
 
         // --- 2. STOCK ADJUSTMENT ---
@@ -241,6 +259,8 @@ export default function App() {
         return <UsersPage onViewChange={setCurrentView} />;
       case 'sellers':
         return <SellersPage userSession={userSession} />;
+      case 'settings':
+        return <SettingsPage />;
       default:
         return <Dashboard onViewChange={setCurrentView} />;
     }
@@ -251,8 +271,14 @@ export default function App() {
       return <LoginPage onLogin={handleLogin} />;
     }
 
+    const themeClasses = {
+      light: 'bg-slate-50',
+      soft: 'bg-orange-50/30',
+      slate: 'bg-slate-100'
+    };
+
     return (
-      <div className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-brand-light selection:text-brand-dark">
+      <div className={cn("min-h-screen font-sans text-slate-900 selection:bg-brand-light selection:text-brand-dark transition-colors duration-500", themeClasses[theme])}>
         <PopupAd />                
         <Sidebar 
           currentView={currentView} 

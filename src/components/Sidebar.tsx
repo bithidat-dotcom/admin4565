@@ -23,6 +23,7 @@ export default function Sidebar({ currentView, onViewChange, isOpen = false, onC
     { id: 'banners' as View, icon: ImageIcon, label: 'Banners', adminOnly: true },
     { id: 'reviews' as View, icon: Star, label: 'Reviews', adminOnly: true },
     { id: 'sellers' as View, icon: Store, label: 'Sellers', adminOnly: false },
+    { id: 'settings' as View, icon: Settings, label: 'Settings', adminOnly: true },
   ].filter(item => !isSeller || !item.adminOnly);
 
   return (
@@ -74,13 +75,13 @@ export default function Sidebar({ currentView, onViewChange, isOpen = false, onC
             className={cn(
               "w-full flex items-center justify-start gap-4 p-4 rounded-2xl transition-all duration-300 group cursor-pointer relative",
               currentView === item.id
-                ? "bg-slate-900 text-white shadow-lg"
+                ? "bg-brand text-white shadow-lg shadow-brand/20"
                 : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"
             )}
           >
             <item.icon className={cn(
               "w-6 h-6",
-              currentView === item.id ? "text-brand" : "text-slate-400 group-hover:text-slate-600"
+              currentView === item.id ? "text-white" : "text-slate-400 group-hover:text-slate-600"
             )} />
             <span className="text-sm font-black uppercase tracking-tight">{item.label}</span>
             {item.id === 'orders' && !isSeller && (
@@ -127,7 +128,7 @@ export default function Sidebar({ currentView, onViewChange, isOpen = false, onC
 
       <div className="p-6 border-t border-slate-100 bg-slate-50/50">
         <div className="flex items-center gap-3 p-3 bg-white rounded-2xl border border-slate-200/60 shadow-sm">
-          <div className="w-9 h-9 rounded-xl bg-slate-900 flex items-center justify-center text-white font-black text-xs">
+          <div className="w-9 h-9 rounded-xl bg-brand flex items-center justify-center text-white font-black text-xs">
             {userSession?.role === 'admin' ? 'BA' : userSession?.name?.slice(0, 2).toUpperCase()}
           </div>
           <div className="flex flex-col overflow-hidden">

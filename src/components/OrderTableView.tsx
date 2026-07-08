@@ -32,6 +32,7 @@ export default function OrderTableView({ orders, onStatusChange, statusUpdatingI
           <thead>
             <tr className="bg-slate-50/70 border-b border-slate-100">
               <th className="px-3 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest">SL</th>
+              <th className="px-3 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest">Ordered At</th>
               <th className="px-3 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest">User / Contact</th>
               <th className="px-3 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest">Location</th>
               <th className="px-3 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest">Product</th>
@@ -46,6 +47,10 @@ export default function OrderTableView({ orders, onStatusChange, statusUpdatingI
             {orders.map((order, index) => (
               <tr key={order.id} className="group hover:bg-slate-50/50 transition-colors">
                 <td className="px-3 py-4 text-xs text-slate-500 font-bold">{index + 1}</td>
+                <td className="px-3 py-4">
+                  <div className="text-[10px] font-black text-slate-900 uppercase">{order.created_at ? format(new Date(order.created_at), 'dd MMM yyyy') : 'N/A'}</div>
+                  <div className="text-[9px] text-indigo-600 font-bold">{order.created_at ? format(new Date(order.created_at), 'h:mm a') : 'N/A'}</div>
+                </td>
                 <td className="px-3 py-4">
                   <div className="text-sm font-black text-slate-900 uppercase">{order.customer_name}</div>
                   <div className="text-[10px] text-slate-400 font-bold tracking-tight">{order.whatsapp_number}</div>

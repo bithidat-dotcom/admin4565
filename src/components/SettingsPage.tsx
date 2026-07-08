@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { Loader2, Save, ToggleLeft, ToggleRight, DollarSign, Image as ImageIcon } from 'lucide-react';
+import { Loader2, Save, ToggleLeft, ToggleRight, DollarSign, Palette } from 'lucide-react';
 import { Banner } from '../types';
+import { cn } from '../lib/utils';
 
 export default function SettingsPage() {
   const [coupon, setCoupon] = useState({ isActive: false, minPurchase: 0, discountAmount: 0 });
@@ -10,8 +11,12 @@ export default function SettingsPage() {
   const [adSettings, setAdSettings] = useState({ isActive: false, bannerId: '' });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [theme, setTheme] = useState<'light' | 'soft' | 'slate'>('light');
 
   useEffect(() => {
+    const savedTheme = localStorage.getItem('app-theme') as any;
+    if (savedTheme) setTheme(savedTheme);
+
     async function fetchData() {
       const couponDoc = await getDoc(doc(db, 'settings', 'coupon'));
       if (couponDoc.exists()) setCoupon(couponDoc.data() as any);
@@ -29,6 +34,8 @@ export default function SettingsPage() {
 
   async function handleUpdate() {
     setSaving(true);
+    localStorage.setItem('app-theme', theme);
+    window.dispatchEvent(new Event('theme-change'));
     try {
       await setDoc(doc(db, 'settings', 'coupon'), coupon, { merge: true });
       await setDoc(doc(db, 'settings', 'adPopup'), adSettings, { merge: true });
@@ -95,7 +102,30 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      <button onClick={handleUpdate} disabled={saving} className="w-full bg-slate-900 text-white py-3 rounded-xl font-black uppercase text-xs tracking-widest hover:bg-slate-800 transition-all flex items-center justify-center gap-2">
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
+        <h2 className="text-sm font-black uppercase tracking-widest text-slate-900">System Theme & Branding</h2>
+        <div className="grid grid-cols-3 gap-3">
+            {[
+                { id: 'light', label: 'Classic White', color: 'bg-white border-slate-200' },
+                { id: 'soft', label: 'Soft Peach', color: 'bg-orange-50 border-orange-100' },
+                { id: 'slate', label: 'Slate Gray', color: 'bg-slate-100 border-slate-200' }
+            ].map(t => (
+                <button
+                    key={t.id}
+                    onClick={() => setTheme(t.id as any)}
+                    className={cn(
+                        "flex flex-col items-center gap-2 p-3 rounded-xl border transition-all cursor-pointer",
+                        theme === t.id ? "border-brand ring-2 ring-brand/10 bg-brand-light" : "bg-white border-slate-100 hover:border-slate-300"
+                    )}
+                >
+                    <div className={cn("w-10 h-10 rounded-full border shadow-inner", t.color)} />
+                    <span className={cn("text-[9px] font-black uppercase tracking-tighter", theme === t.id ? "text-brand" : "text-slate-400")}>{t.label}</span>
+                </button>
+            ))}
+        </div>
+      </div>
+
+      <button onClick={handleUpdate} disabled={saving} className="w-full bg-brand text-white py-3 rounded-xl font-black uppercase text-xs tracking-widest hover:bg-brand-dark transition-all flex items-center justify-center gap-2 shadow-lg shadow-brand/20 active:scale-95">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             {saving ? 'SAVING...' : 'SAVE ALL SETTINGS'}
         </button>

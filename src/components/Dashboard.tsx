@@ -610,8 +610,8 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
                     <h3 className="font-black text-slate-900 text-base uppercase tracking-tight">Real-time Orders Feed</h3>
                     <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Global stream activity from Firestore</p>
                   </div>
-                  <div className="flex items-center gap-2 text-[10px] font-black text-brand bg-slate-900 px-3 py-1.5 rounded-lg uppercase tracking-wider text-white">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <div className="flex items-center gap-2 text-[10px] font-black text-white bg-brand px-3 py-1.5 rounded-lg uppercase tracking-wider shadow-sm shadow-brand/20">
+                    <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
                     Live Syncing
                   </div>
                 </div>
@@ -649,7 +649,7 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
                             <span className={cn(
                               "px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border shrink-0 inline-block",
                               order.status === 'delivered' ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
-                              order.status === 'completed' ? "bg-slate-900 text-white border-slate-900" :
+                              order.status === 'completed' ? "bg-brand text-white border-brand" :
                               order.status === 'pending' ? "bg-amber-50 text-amber-600 border-amber-100" :
                               order.status === 'cancelled' ? "bg-red-50 text-red-600 border-red-100" :
                               "bg-indigo-50 text-indigo-600 border-indigo-100"

@@ -224,7 +224,7 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
         limit(500)
       );
     } else {
-      q = query(collection(db, 'products'), limit(1000));
+      q = query(collection(db, 'products'), limit(250));
     }
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -755,46 +755,46 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
 
                   {/* Micro Gadget Specs Panel */}
                   {product.category === 'Gadget' && product.gadgetSpecs && (
-                    <div className="mt-3 bg-slate-900 border border-slate-800 rounded-xl p-3 space-y-2 text-white">
-                      <div className="flex items-center gap-1 text-[8.5px] font-black text-slate-400 uppercase tracking-widest pb-1 border-b border-slate-800/80">
+                    <div className="mt-3 bg-brand-light/50 border border-brand/10 rounded-xl p-3 space-y-2">
+                      <div className="flex items-center gap-1 text-[8.5px] font-black text-brand uppercase tracking-widest pb-1 border-b border-brand/10">
                         <Smartphone className="w-3.5 h-3.5 text-brand" />
                         Hardware Specifications
                       </div>
                       <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 text-[9.5px]">
                         {product.gadgetSpecs.ram && (
-                          <div className="flex justify-between items-center bg-slate-800 px-1.5 py-1 rounded border border-slate-700/50">
+                          <div className="flex justify-between items-center bg-white px-1.5 py-1 rounded border border-slate-100 shadow-sm">
                             <span className="text-[7.5px] font-bold text-slate-400 uppercase tracking-wider">RAM</span>
                             <span className="font-extrabold text-brand truncate max-w-[40px] uppercase">{product.gadgetSpecs.ram}</span>
                           </div>
                         )}
                         {product.gadgetSpecs.storage && (
-                          <div className="flex justify-between items-center bg-slate-800 px-1.5 py-1 rounded border border-slate-700/50">
+                          <div className="flex justify-between items-center bg-white px-1.5 py-1 rounded border border-slate-100 shadow-sm">
                             <span className="text-[7.5px] font-bold text-slate-400 uppercase tracking-wider">ROM</span>
-                            <span className="font-extrabold text-white truncate max-w-[40px] uppercase">{product.gadgetSpecs.storage}</span>
+                            <span className="font-extrabold text-slate-900 truncate max-w-[40px] uppercase">{product.gadgetSpecs.storage}</span>
                           </div>
                         )}
                         {product.gadgetSpecs.refreshRate && (
-                          <div className="flex justify-between items-center bg-slate-800 px-1.5 py-1 rounded border border-slate-700/50 col-span-2">
+                          <div className="flex justify-between items-center bg-white px-1.5 py-1 rounded border border-slate-100 shadow-sm col-span-2">
                             <span className="text-[7.5px] font-bold text-slate-400 uppercase tracking-wider">Refresh</span>
-                            <span className="font-extrabold text-white truncate uppercase">{product.gadgetSpecs.refreshRate}</span>
+                            <span className="font-extrabold text-slate-900 truncate uppercase">{product.gadgetSpecs.refreshRate}</span>
                           </div>
                         )}
                         {product.gadgetSpecs.battery && (
-                          <div className="flex justify-between items-center bg-slate-800 px-1.5 py-1 rounded border border-slate-700/50 col-span-2">
+                          <div className="flex justify-between items-center bg-white px-1.5 py-1 rounded border border-slate-100 shadow-sm col-span-2">
                             <span className="text-[7.5px] font-bold text-slate-400 uppercase tracking-wider">Battery</span>
-                            <span className="font-extrabold text-white truncate uppercase">{product.gadgetSpecs.battery}</span>
+                            <span className="font-extrabold text-slate-900 truncate uppercase">{product.gadgetSpecs.battery}</span>
                           </div>
                         )}
                         {product.gadgetSpecs.watt && (
-                          <div className="flex justify-between items-center bg-slate-800 px-1.5 py-1 rounded border border-slate-700/50">
+                          <div className="flex justify-between items-center bg-white px-1.5 py-1 rounded border border-slate-100 shadow-sm">
                             <span className="text-[7.5px] font-bold text-slate-400 uppercase tracking-wider">Watt</span>
-                            <span className="font-extrabold text-white truncate max-w-[40px] uppercase">{product.gadgetSpecs.watt}</span>
+                            <span className="font-extrabold text-slate-900 truncate max-w-[40px] uppercase">{product.gadgetSpecs.watt}</span>
                           </div>
                         )}
                         {product.gadgetSpecs.amp && (
-                          <div className="flex justify-between items-center bg-slate-800 px-1.5 py-1 rounded border border-slate-700/50">
+                          <div className="flex justify-between items-center bg-white px-1.5 py-1 rounded border border-slate-100 shadow-sm">
                             <span className="text-[7.5px] font-bold text-slate-400 uppercase tracking-wider">Amp</span>
-                            <span className="font-extrabold text-white truncate max-w-[40px] uppercase">{product.gadgetSpecs.amp}</span>
+                            <span className="font-extrabold text-slate-900 truncate max-w-[40px] uppercase">{product.gadgetSpecs.amp}</span>
                           </div>
                         )}
                       </div>
@@ -945,7 +945,7 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
             />
             <button
               onClick={verifyPasswordAndProceed}
-              className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-slate-800"
+              className="w-full py-3 bg-brand text-white rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-brand-dark"
             >
               Next
             </button>
@@ -961,11 +961,11 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
                 No
               </button>
               <button
-                onClick={executeDeleteAll}
-                className="flex-1 py-3 bg-red-500 text-white rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-red-600"
-              >
-                Yes, Delete All
-              </button>
+              onClick={executeDeleteAll}
+              className="flex-1 py-3 bg-brand text-white rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-brand-dark"
+            >
+              Yes, Delete All
+            </button>
             </div>
           </div>
         )}
@@ -1163,15 +1163,15 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
                     className={cn(
                       "snap-start flex flex-col items-center gap-2 p-3 rounded-2xl border transition-all shrink-0 min-w-[100px] cursor-pointer",
                       formData.seller === '' 
-                        ? "bg-slate-900 border-slate-900 shadow-xl scale-105" 
+                        ? "bg-brand border-brand shadow-xl scale-105" 
                         : "bg-white border-slate-200 hover:border-slate-400"
                     )}
                   >
                     <div className={cn(
                       "w-12 h-12 rounded-xl flex items-center justify-center border-2",
-                      formData.seller === '' ? "bg-slate-800 border-brand" : "bg-slate-50 border-slate-100"
+                      formData.seller === '' ? "bg-brand-dark border-brand" : "bg-slate-50 border-slate-100"
                     )}>
-                      <Store className={cn("w-6 h-6", formData.seller === '' ? "text-brand" : "text-slate-400")} />
+                      <Store className={cn("w-6 h-6", formData.seller === '' ? "text-white" : "text-slate-400")} />
                     </div>
                     <span className={cn("text-[10px] font-black uppercase tracking-widest truncate max-w-[80px]", formData.seller === '' ? "text-white" : "text-slate-600")}>Official</span>
                   </button>
@@ -1193,7 +1193,7 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
                       className={cn(
                         "snap-start flex flex-col items-center gap-2 p-3 rounded-2xl border transition-all shrink-0 min-w-[100px] cursor-pointer",
                         formData.seller === s.name 
-                          ? "bg-slate-900 border-slate-900 shadow-xl scale-105" 
+                          ? "bg-brand border-brand shadow-xl scale-105" 
                           : "bg-white border-slate-200 hover:border-slate-400"
                       )}
                     >
@@ -1505,7 +1505,7 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
               <button
                 type="button"
                 onClick={addExtraImage}
-                className="p-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors"
+                className="p-2 bg-brand text-white rounded-lg hover:bg-brand-dark transition-colors"
                 disabled={!newImageUrl}
               >
                 <Plus className="w-5 h-5" />
@@ -1541,7 +1541,7 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
             <button
               type="submit"
               disabled={submitting}
-              className="flex-[2] px-6 py-3 rounded-xl bg-slate-900 text-white text-xs font-black uppercase tracking-widest hover:bg-black transition-all shadow-lg shadow-slate-200 flex items-center justify-center gap-2"
+              className="flex-[2] px-6 py-3 rounded-xl bg-brand text-white text-xs font-black uppercase tracking-widest hover:bg-brand-dark active:bg-orange-700 transition-all shadow-lg shadow-brand/20 flex items-center justify-center gap-2"
             >
               {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
               {editingProduct ? 'Update Data' : 'Save Instance'}

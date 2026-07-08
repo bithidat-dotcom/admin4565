@@ -98,7 +98,7 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
         limit(500)
       );
     } else {
-      q = query(collection(db, 'orders'), limit(1000));
+      q = query(collection(db, 'orders'), limit(250));
     }
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -688,8 +688,8 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
                                 <MoreVertical className="w-6 h-6" />
                               </button>
                               
-                              <div className="absolute bottom-full right-0 mb-4 w-64 bg-slate-900 rounded-[32px] p-4 shadow-2xl opacity-0 invisible group-hover/menu:opacity-100 group-hover/menu:visible transition-all duration-500 z-50 translate-y-4 group-hover/menu:translate-y-0 backdrop-blur-xl border border-white/10">
-                                <p className="px-5 py-3 text-[9px] font-black text-white/40 uppercase tracking-widest border-b border-white/5 mb-3">Lifecycle Control</p>
+                              <div className="absolute bottom-full right-0 mb-4 w-64 bg-white rounded-[32px] p-4 shadow-2xl opacity-0 invisible group-hover/menu:opacity-100 group-hover/menu:visible transition-all duration-500 z-50 translate-y-4 group-hover/menu:translate-y-0 backdrop-blur-xl border border-slate-100">
+                                <p className="px-5 py-3 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 mb-3">Lifecycle Control</p>
                                 <div className="grid grid-cols-1 gap-1.5">
                                   {['pending', 'confirmed', 'packing', 'shipping', 'delivered', 'completed', 'cancelled'].map((status) => (
                                     <button
@@ -698,18 +698,18 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
                                       disabled={statusUpdatingId === order.id}
                                       className={cn(
                                         "px-5 py-2.5 text-left rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all",
-                                        order.status === status ? "bg-brand text-white shadow-lg shadow-brand/20" : "text-white/50 hover:bg-white/10 hover:text-white"
+                                        order.status === status ? "bg-brand text-white shadow-lg shadow-brand/20" : "text-slate-400 hover:bg-slate-50 hover:text-slate-900"
                                       )}
                                     >
                                       {statusUpdatingId === order.id && order.status === status ? <Loader2 className="w-3 h-3 animate-spin mx-auto"/> : status}
                                     </button>
                                   ))}
                                 </div>
-                                <div className="mt-3 pt-3 border-t border-white/5">
+                                <div className="mt-3 pt-3 border-t border-slate-50">
                                   <button 
                                     onClick={() => handleDeleteOrder(order.id)}
                                     disabled={deletingId === order.id}
-                                    className="w-full px-5 py-3 text-left text-rose-400 hover:bg-rose-500/10 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
+                                    className="w-full px-5 py-3 text-left text-rose-500 hover:bg-rose-50 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
                                   >
                                     Purge Data Record
                                   </button>
@@ -778,14 +778,14 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
             <button
               onClick={verifyOtp}
               disabled={enteredOtp.length < 4 || statusUpdatingId !== null}
-              className="flex-1 py-4 bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-200 active:scale-98 transition-all text-white text-xs font-black uppercase tracking-widest rounded-2xl shadow-lg shadow-emerald-100 flex items-center justify-center gap-2"
+              className="flex-1 py-4 bg-brand hover:bg-brand-dark active:bg-orange-700 active:scale-95 disabled:bg-slate-200 transition-all text-white text-xs font-black uppercase tracking-widest rounded-2xl shadow-lg shadow-brand/20 flex items-center justify-center gap-2 cursor-pointer"
             >
               {statusUpdatingId ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
               Verify & Confirm
             </button>
             <button
               onClick={() => setOtpVerifyOrderId(null)}
-              className="px-6 py-4 bg-slate-100 hover:bg-slate-200 text-slate-500 text-xs font-black uppercase tracking-widest rounded-2xl transition-all"
+              className="px-6 py-4 bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-500 text-xs font-black uppercase tracking-widest rounded-2xl transition-all cursor-pointer"
             >
               Cancel
             </button>
