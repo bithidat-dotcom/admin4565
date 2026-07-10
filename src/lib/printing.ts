@@ -11,7 +11,7 @@ export const handlePrint = async (order: Order) => {
   }
 
   const pdf = new jsPDF();
-  const qrData = `https://pbazar-bd.com/product/${order.product_details || order.id}`;
+  const qrData = `https://pbazar.vercel.app`;
   
   // Add Logo
   try {
@@ -33,7 +33,7 @@ export const handlePrint = async (order: Order) => {
     pdf.addImage(qrDataUrl, 'PNG', 165, 10, 30, 30);
     pdf.setFontSize(7);
     pdf.setTextColor(100, 116, 139);
-    pdf.text("SCAN TO VERIFY", 168, 42); 
+    pdf.text("Go to Website", 168, 42); 
   } catch (e) {
     console.error("Failed to generate QR code", e);
   }
@@ -89,7 +89,7 @@ export const handlePrint = async (order: Order) => {
     body: [
       [
         '1',
-        `${order.product_name || 'Generic Item'}\nSeller: ${order.seller || 'pbazar Official'}`,
+        order.product_name || 'Generic Item',
         order.seller || 'pbazar Official',
         order.quantity || 1,
         formatCurrency(order.price),
@@ -119,14 +119,26 @@ export const handlePrint = async (order: Order) => {
   pdf.text("Delivery Charge:", 135, finalY + 12);
   pdf.text(formatCurrency(order.delivery_charge || 120), 195, finalY + 12, { align: 'right' });
 
-  pdf.text("Admin Adjust:", 135, finalY + 19);
-  pdf.text("- ৳0.00", 195, finalY + 19, { align: 'right' });
-
   pdf.setFont('helvetica', 'bold');
-  pdf.text("GRAND TOTAL:", 135, finalY + 28);
+  pdf.text("GRAND TOTAL:", 135, finalY + 22);
   pdf.setTextColor(249, 115, 22);
   const grandTotal = ((Number(order.quantity) || 1) * order.price) + (order.delivery_charge || 120);
-  pdf.text(formatCurrency(grandTotal), 195, finalY + 28, { align: 'right' });
+  pdf.text(formatCurrency(grandTotal), 195, finalY + 22, { align: 'right' });
+
+  // Delivery By Section (left side of the table bottom)
+  pdf.setFontSize(8);
+  pdf.setFont('helvetica', 'bold');
+  pdf.setTextColor(30, 41, 59);
+  pdf.text("Delivery By:", 12, finalY + 5);
+  
+  try {
+    const deliveryImg = new window.Image();
+    deliveryImg.src = 'https://i.postimg.cc/KvqR53hq/download-(1).png'; 
+    await new Promise((resolve) => { deliveryImg.onload = resolve; });
+    pdf.addImage(deliveryImg, 'PNG', 12, finalY + 7, 10, 10);
+  } catch (e) {
+    pdf.text("pbazar Logistics", 12, finalY + 10);
+  }
 
   // Footer Signature
   const footerY = 280;
