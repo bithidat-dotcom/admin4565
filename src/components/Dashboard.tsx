@@ -29,6 +29,7 @@ import {
 import { formatCurrency, cn } from '../lib/utils';
 import { Storage } from '../lib/storage';
 import { Order, Product } from '../types';
+import { decryptData } from '../lib/security';
 import { 
   BarChart, 
   Bar, 
@@ -75,31 +76,19 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
   const [boardNote, setBoardNote] = useState(() => Storage.getSmall('dashboard_define_note') || 'Welcome to the pbazar admin hub! Set daily target numbers, notice highlights, or custom operational parameters here.');
   const [isNoteEditing, setIsNoteEditing] = useState(false);
 
-  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
+    if (isQuotaExceeded()) return;
     const timer = setTimeout(() => {
       setMounted(true);
     }, 150);
     return () => clearTimeout(timer);
   }, []);
 
-  const filteredRecentOrders = recentOrders.filter(order => {
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      (order.product_name?.toLowerCase() || '').includes(searchLower) ||
-      (order.customer_name?.toLowerCase() || '').includes(searchLower) ||
-      (order.whatsapp_number || '').includes(searchTerm) ||
-      (order.seller?.toLowerCase() || '').includes(searchLower) ||
-      (order.seller_id?.toLowerCase() || '').includes(searchLower)
-    );
-  });
+  const filteredRecentOrders = recentOrders;
 
   useEffect(() => {
-    if (isQuotaExceeded()) {
-      setLoading(false);
-      return;
-    }
+    if (isQuotaExceeded()) return;
     // Helper to get stats from cache
     const loadCache = async () => {
       const cachedStats = Storage.getSmall<any>('dashboard_stats_cache');
@@ -135,15 +124,23 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
         limit(50)
       );
     } else {
-      qOrders = query(collection(db, 'orders'), limit(100));
+      qOrders = query(collection(db, 'orders'), limit(50));
     }
 
     const unsubscribeOrders = onSnapshot(qOrders, (snapshot) => {
-      let allOrders = snapshot.docs.map(doc => ({ 
-        id: doc.id, 
-        ...doc.data(),
-        created_at: doc.data().created_at?.toDate?.()?.toISOString() || doc.data().created_at || new Date().toISOString()
-      })) as Order[];
+      let allOrders = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return { 
+          id: doc.id, 
+          ...data,
+          customer_name: decryptData(data.customer_name),
+          whatsapp_number: decryptData(data.whatsapp_number),
+          location: decryptData(data.location),
+          area: data.area ? decryptData(data.area) : '',
+          post_code: data.post_code ? decryptData(data.post_code) : '',
+          created_at: data.created_at?.toDate?.()?.toISOString() || data.created_at || new Date().toISOString()
+        };
+      }) as Order[];
       
       allOrders.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       
@@ -175,7 +172,7 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
     const productCol = collection(db, 'products');
     const qProducts = (isSeller && !isShowingGlobal) 
       ? query(productCol, or(where('seller_id', '==', currentSellerId), where('seller', '==', currentSellerName)), limit(50)) 
-      : query(productCol, limit(100));
+      : query(productCol, limit(50));
 
     const unsubscribeProducts = onSnapshot(qProducts, (snapshot) => {
       const pList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[];
@@ -270,7 +267,7 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
 
   return (
     <div className="flex-1 overflow-x-hidden pb-24 md:pb-0">
-      <Header title="Dashboard" onSearch={setSearchTerm} />
+      <Header title="Dashboard" />
 
       <main className="p-4 md:p-8 space-y-4 md:space-y-8 w-full max-w-[1600px] mx-auto">
         {loading ? (
@@ -640,6 +637,12 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
                             <div className="text-[10px] text-slate-400 font-bold">
                               {order.whatsapp_number || 'No contact'}
                             </div>
+                            {(order.area || order.post_code) && (
+                              <div className="flex gap-1.5 mt-1">
+                                {order.area && <span className="text-[8px] font-black bg-rose-50 text-rose-500 px-1 py-0.5 rounded uppercase tracking-tighter">{order.area}</span>}
+                                {order.post_code && <span className="text-[8px] font-black bg-slate-100 text-slate-500 px-1 py-0.5 rounded uppercase tracking-tighter">{order.post_code}</span>}
+                              </div>
+                            )}
                             <div className="text-[10px] text-brand font-black mt-1.5 uppercase tracking-widest">
                               {order.product_name || 'Product Info'}
                             </div>

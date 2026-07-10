@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db, handleFirestoreError, OperationType, isQuotaExceeded } from '../lib/firebase';
 import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, getDocs, limit } from 'firebase/firestore';
 import { Seller, Product, Order, Review } from '../types';
+import { decryptData } from '../lib/security';
 import Header from '../components/Header';
 import Modal from '../components/Modal';
 import { 
@@ -72,10 +73,7 @@ export default function SellersPage({ userSession }: SellersPageProps) {
   });
 
   useEffect(() => {
-    if (isQuotaExceeded()) {
-      setLoading(false);
-      return;
-    }
+    if (isQuotaExceeded()) return;
     // 0. Load cache for instant display
     const loadCache = async () => {
       const cachedSellers = await Storage.getLarge<Seller[]>('sellers_page_cache');
@@ -86,7 +84,7 @@ export default function SellersPage({ userSession }: SellersPageProps) {
     loadCache();
 
     // 1. Subscribe to Sellers (Primary)
-    const qSellers = query(collection(db, 'sellers'), orderBy('created_at', 'desc'), limit(100));
+    const qSellers = query(collection(db, 'sellers'), orderBy('created_at', 'desc'), limit(50));
     const unsubscribeSellers = onSnapshot(qSellers, (snapshot) => {
       const sellersData = snapshot.docs.map(doc => ({
         id: doc.id,
@@ -105,13 +103,25 @@ export default function SellersPage({ userSession }: SellersPageProps) {
     const fetchDependencies = async () => {
       try {
         const [productsSnap, ordersSnap, reviewsSnap] = await Promise.all([
-          getDocs(query(collection(db, 'products'), limit(100))),
-          getDocs(query(collection(db, 'orders'), orderBy('created_at', 'desc'), limit(100))),
-          getDocs(query(collection(db, 'reviews'), orderBy('date', 'desc'), limit(100)))
+          getDocs(query(collection(db, 'products'), limit(50))),
+          getDocs(query(collection(db, 'orders'), orderBy('created_at', 'desc'), limit(50))),
+          getDocs(query(collection(db, 'reviews'), orderBy('date', 'desc'), limit(50)))
         ]);
 
         setProducts(productsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[]);
-        setOrders(ordersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Order[]);
+        setOrders(ordersSnap.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            ...data,
+            customer_name: decryptData(data.customer_name),
+            whatsapp_number: decryptData(data.whatsapp_number),
+            location: decryptData(data.location),
+            area: data.area ? decryptData(data.area) : '',
+            post_code: data.post_code ? decryptData(data.post_code) : '',
+            created_at: data.created_at?.toDate?.()?.toISOString() || data.created_at || new Date().toISOString()
+          };
+        }) as Order[]);
         setReviews(reviewsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Review[]);
       } catch (err) {
         console.warn("Failed fetch of dependencies in SellersPage, might be quota issue:", err);

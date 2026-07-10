@@ -55,7 +55,23 @@ export default function OrderTableView({ orders, onStatusChange, statusUpdatingI
                   <div className="text-sm font-black text-slate-900 uppercase">{order.customer_name}</div>
                   <div className="text-[10px] text-slate-400 font-bold tracking-tight">{order.whatsapp_number}</div>
                 </td>
-                <td className="px-3 py-4 text-xs font-bold text-slate-600 truncate max-w-[120px]">{order.location}</td>
+                <td className="px-3 py-4">
+                  <div className="text-xs font-bold text-slate-600 line-clamp-1 max-w-[150px]" title={order.location}>{order.location}</div>
+                  {(order.area || order.post_code) && (
+                    <div className="flex gap-1.5 mt-1">
+                      {order.area && (
+                        <span className="text-[8px] font-black bg-rose-50 text-rose-500 px-1 py-0.5 rounded uppercase tracking-tighter">
+                          {order.area}
+                        </span>
+                      )}
+                      {order.post_code && (
+                        <span className="text-[8px] font-black bg-slate-100 text-slate-500 px-1 py-0.5 rounded uppercase tracking-tighter">
+                          {order.post_code}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </td>
                 <td className="px-3 py-4">
                   <div className="flex items-center gap-3 min-w-[200px]">
                     {order.product_image ? (

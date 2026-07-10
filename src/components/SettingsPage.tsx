@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { db, isQuotaExceeded } from '../lib/firebase';
 import { Loader2, Save, ToggleLeft, ToggleRight, DollarSign, Palette } from 'lucide-react';
 import { Banner } from '../types';
 import { cn } from '../lib/utils';
@@ -14,6 +14,7 @@ export default function SettingsPage() {
   const [theme, setTheme] = useState<'light' | 'soft' | 'slate'>('light');
 
   useEffect(() => {
+    if (isQuotaExceeded()) return;
     const savedTheme = localStorage.getItem('app-theme') as any;
     if (savedTheme) setTheme(savedTheme);
 

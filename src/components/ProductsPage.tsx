@@ -61,6 +61,7 @@ function DiscountTimer({ expiresAt }: { expiresAt: string }) {
   const [timeLeft, setTimeLeft] = useState<string>('');
 
   useEffect(() => {
+    if (isQuotaExceeded()) return;
     if (!expiresAt) return;
 
     const updateTimer = () => {
@@ -176,10 +177,12 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
   const categories = ['Food', 'Fashion', 'Gadget', 'Robotic', 'PC', 'Cloth', 'Sports', 'Grocery'];
 
   useEffect(() => {
+    if (isQuotaExceeded()) return;
     setFilterCategory(defaultCategory);
   }, [defaultCategory]);
 
   useEffect(() => {
+    if (isQuotaExceeded()) return;
     onCategoryFilterChange?.(filterCategory);
   }, [filterCategory, onCategoryFilterChange]);
 
@@ -198,10 +201,7 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
   });
 
   useEffect(() => {
-    if (isQuotaExceeded()) {
-      setLoading(false);
-      return;
-    }
+    if (isQuotaExceeded()) return;
     // Load cache
     const loadCache = async () => {
       const cachedProducts = await Storage.getLarge<Product[]>('products_page_cache');
@@ -225,7 +225,7 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
           where('seller_id', '==', currentSellerId),
           where('seller', '==', currentSellerName)
         ),
-        limit(150)
+        limit(50)
       );
     } else {
       q = query(collection(db, 'products'), limit(200));

@@ -14,10 +14,7 @@ export default function ReviewsPage() {
   const [reviewToDelete, setReviewToDelete] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isQuotaExceeded()) {
-      setLoading(false);
-      return;
-    }
+    if (isQuotaExceeded()) return;
     const q = query(collection(db, 'reviews'), orderBy('created_at', 'desc'));
     
     const unsubscribe = onSnapshot(q, (snapshot) => {

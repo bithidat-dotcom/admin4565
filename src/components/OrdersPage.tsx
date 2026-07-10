@@ -43,6 +43,8 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
     customer_name: '',
     whatsapp_number: '',
     location: '',
+    area: '',
+    post_code: '',
     product_id: '',
     quantity: 1,
     delivery_charge: 120
@@ -63,10 +65,7 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
   const [sellerSearch, setSellerSearch] = useState('');
 
   useEffect(() => {
-    if (isQuotaExceeded()) {
-      setLoading(false);
-      return;
-    }
+    if (isQuotaExceeded()) return;
     // 0. Load cache for instant display
     const loadCache = async () => {
       const cachedOrders = await Storage.getLarge<Order[]>('orders_page_cache');
@@ -90,7 +89,7 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
           where('seller_id', '==', currentSellerId),
           where('seller', '==', currentSellerName)
         ),
-        limit(100)
+        limit(50)
       );
     } else if (sellerSearch.trim()) {
       // Admin searching for specific seller orders
@@ -99,10 +98,10 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
       q = query(
         collection(db, 'orders'),
         where('seller_id', '==', searchLower),
-        limit(100)
+        limit(50)
       );
     } else {
-      q = query(collection(db, 'orders'), limit(150));
+      q = query(collection(db, 'orders'), limit(50));
     }
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -114,6 +113,8 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
           customer_name: decryptData(rawData.customer_name),
           whatsapp_number: decryptData(rawData.whatsapp_number),
           location: decryptData(rawData.location),
+          area: rawData.area ? decryptData(rawData.area) : '',
+          post_code: rawData.post_code ? decryptData(rawData.post_code) : '',
           product_details: decryptData(rawData.product_details),
           created_at: rawData.created_at?.toDate?.()?.toISOString() || rawData.created_at || new Date().toISOString()
         };
@@ -150,7 +151,7 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
 
     const fetchProducts = async () => {
       try {
-        const q = query(collection(db, 'products'), limit(150));
+        const q = query(collection(db, 'products'), limit(50));
         const snapshot = await getDocs(q);
         setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Product));
       } catch (err) {
@@ -346,6 +347,8 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
         customer_name: encryptData(newOrderData.customer_name),
         whatsapp_number: encryptData(newOrderData.whatsapp_number),
         location: encryptData(newOrderData.location),
+        area: encryptData(newOrderData.area),
+        post_code: encryptData(newOrderData.post_code),
         product_details: encryptData(selectedProduct.name),
         product_name: selectedProduct.name,
         product_image: selectedProduct.image,
@@ -366,6 +369,8 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
         customer_name: '',
         whatsapp_number: '',
         location: '',
+        area: '',
+        post_code: '',
         product_id: '',
         quantity: 1,
         delivery_charge: 120
@@ -612,6 +617,20 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
                               <div className="flex-1">
                                 <p className="text-[10px] font-black text-rose-400 uppercase tracking-widest mb-1">Shipping Hub</p>
                                 <p className="text-sm font-bold text-slate-600 leading-relaxed line-clamp-2">{order.location}</p>
+                                {(order.area || order.post_code) && (
+                                  <div className="mt-1 flex flex-wrap gap-2">
+                                    {order.area && (
+                                      <span className="text-[9px] font-black bg-rose-100 text-rose-600 px-1.5 py-0.5 rounded uppercase tracking-tighter">
+                                        Area: {order.area}
+                                      </span>
+                                    )}
+                                    {order.post_code && (
+                                      <span className="text-[9px] font-black bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded uppercase tracking-tighter">
+                                        Post: {order.post_code}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -844,6 +863,30 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
               placeholder="Full Address"
               rows={2}
             />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Area / City</label>
+              <input
+                required
+                type="text"
+                value={newOrderData.area}
+                onChange={e => setNewOrderData({...newOrderData, area: e.target.value})}
+                className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-brand text-xs font-bold"
+                placeholder="e.g. Dhaka"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Post Code</label>
+              <input
+                type="text"
+                value={newOrderData.post_code}
+                onChange={e => setNewOrderData({...newOrderData, post_code: e.target.value})}
+                className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-brand text-xs font-bold"
+                placeholder="Optional"
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

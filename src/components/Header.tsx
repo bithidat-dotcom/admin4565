@@ -35,15 +35,17 @@ export default function Header({ title, onAction, actionLabel, onSearch, childre
         <img src="https://i.postimg.cc/KvqR53hq/download-(1).png" alt="Logo" className="w-8 h-8 rounded-full hidden sm:block object-contain bg-white/10 p-0.5" />
         <h2 className="text-xs md:text-sm font-black text-white uppercase tracking-[0.2em] truncate pr-2 max-w-[124px] sm:max-w-none">{title}</h2>
         
-        <div className="flex items-center gap-2 md:gap-3 bg-white/10 border border-white/20 px-3 md:px-4 py-2 md:py-2.5 rounded-xl w-full max-w-[180px] sm:max-w-xs group focus-within:ring-4 focus-within:ring-white/10 focus-within:bg-white/20 transition-all duration-300">
-          <Search className="w-3.5 h-3.5 text-white/60 group-focus-within:text-white transition-colors shrink-0" />
-          <input 
-            type="text" 
-            placeholder="Search..." 
-            onChange={(e) => onSearch?.(e.target.value)}
-            className="bg-transparent border-none outline-none text-[10px] md:text-[11px] font-black uppercase tracking-widest w-full placeholder:text-white/40 text-white transition-all"
-          />
-        </div>
+        {onSearch && (
+          <div className="flex items-center gap-2 md:gap-3 bg-white/10 border border-white/20 px-3 md:px-4 py-2 md:py-2.5 rounded-xl w-full max-w-[180px] sm:max-w-xs group focus-within:ring-4 focus-within:ring-white/10 focus-within:bg-white/20 transition-all duration-300">
+            <Search className="w-3.5 h-3.5 text-white/60 group-focus-within:text-white transition-colors shrink-0" />
+            <input 
+              type="text" 
+              placeholder="Search..." 
+              onChange={(e) => onSearch(e.target.value)}
+              className="bg-transparent border-none outline-none text-[10px] md:text-[11px] font-black uppercase tracking-widest w-full placeholder:text-white/40 text-white transition-all"
+            />
+          </div>
+        )}
         {children}
       </div>
       

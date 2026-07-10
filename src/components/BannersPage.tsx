@@ -22,10 +22,7 @@ export default function BannersPage() {
   const [previewBanner, setPreviewBanner] = useState<Banner | null>(null);
 
   useEffect(() => {
-    if (isQuotaExceeded()) {
-      setLoading(false);
-      return;
-    }
+    if (isQuotaExceeded()) return;
     const q = query(collection(db, 'banners'), orderBy('created_at', 'desc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const bannersData = snapshot.docs.map(doc => ({
