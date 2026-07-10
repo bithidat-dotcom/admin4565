@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { db, handleFirestoreError, OperationType, isQuotaExceeded } from '../lib/firebase';
 import { collection, onSnapshot, query, orderBy, deleteDoc, doc } from 'firebase/firestore';
 import { Review } from '../types';
 import Header from '../components/Header';
@@ -14,6 +14,10 @@ export default function ReviewsPage() {
   const [reviewToDelete, setReviewToDelete] = useState<string | null>(null);
 
   useEffect(() => {
+    if (isQuotaExceeded()) {
+      setLoading(false);
+      return;
+    }
     const q = query(collection(db, 'reviews'), orderBy('created_at', 'desc'));
     
     const unsubscribe = onSnapshot(q, (snapshot) => {

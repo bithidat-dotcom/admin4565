@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { doc, onSnapshot, getDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { db, isQuotaExceeded } from '../lib/firebase';
 import { Storage } from '../lib/storage';
 import { motion, AnimatePresence } from 'motion/react';
 import { X } from 'lucide-react';
@@ -14,6 +14,8 @@ export default function PopupAd() {
   const [imageLoaded, setImageLoaded] = useState(false);
 
   useEffect(() => {
+    if (isQuotaExceeded()) return;
+    
     // Reset image loaded state when banner changes
     setImageLoaded(false);
     

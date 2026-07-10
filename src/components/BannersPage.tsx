@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { db, handleFirestoreError, OperationType, isQuotaExceeded } from '../lib/firebase';
 import { collection, onSnapshot, query, orderBy, addDoc, deleteDoc, doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { Banner } from '../types';
 import Header from '../components/Header';
@@ -22,6 +22,10 @@ export default function BannersPage() {
   const [previewBanner, setPreviewBanner] = useState<Banner | null>(null);
 
   useEffect(() => {
+    if (isQuotaExceeded()) {
+      setLoading(false);
+      return;
+    }
     const q = query(collection(db, 'banners'), orderBy('created_at', 'desc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const bannersData = snapshot.docs.map(doc => ({

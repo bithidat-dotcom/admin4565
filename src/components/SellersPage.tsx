@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { db, handleFirestoreError, OperationType, isQuotaExceeded } from '../lib/firebase';
 import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, getDocs, limit } from 'firebase/firestore';
 import { Seller, Product, Order, Review } from '../types';
 import Header from '../components/Header';
@@ -72,6 +72,10 @@ export default function SellersPage({ userSession }: SellersPageProps) {
   });
 
   useEffect(() => {
+    if (isQuotaExceeded()) {
+      setLoading(false);
+      return;
+    }
     // 0. Load cache for instant display
     const loadCache = async () => {
       const cachedSellers = await Storage.getLarge<Seller[]>('sellers_page_cache');
@@ -101,9 +105,9 @@ export default function SellersPage({ userSession }: SellersPageProps) {
     const fetchDependencies = async () => {
       try {
         const [productsSnap, ordersSnap, reviewsSnap] = await Promise.all([
-          getDocs(query(collection(db, 'products'), limit(200))),
-          getDocs(query(collection(db, 'orders'), orderBy('created_at', 'desc'), limit(200))),
-          getDocs(query(collection(db, 'reviews'), orderBy('date', 'desc'), limit(200)))
+          getDocs(query(collection(db, 'products'), limit(100))),
+          getDocs(query(collection(db, 'orders'), orderBy('created_at', 'desc'), limit(100))),
+          getDocs(query(collection(db, 'reviews'), orderBy('date', 'desc'), limit(100)))
         ]);
 
         setProducts(productsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[]);

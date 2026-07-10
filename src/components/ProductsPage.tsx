@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { db, handleFirestoreError, OperationType, isQuotaExceeded } from '../lib/firebase';
 import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc, Timestamp, writeBatch, getDocs, serverTimestamp, limit, where, or } from 'firebase/firestore';
 import { Product, Seller } from '../types';
 import Header from '../components/Header';
@@ -198,6 +198,10 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
   });
 
   useEffect(() => {
+    if (isQuotaExceeded()) {
+      setLoading(false);
+      return;
+    }
     // Load cache
     const loadCache = async () => {
       const cachedProducts = await Storage.getLarge<Product[]>('products_page_cache');
@@ -221,10 +225,10 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
           where('seller_id', '==', currentSellerId),
           where('seller', '==', currentSellerName)
         ),
-        limit(500)
+        limit(150)
       );
     } else {
-      q = query(collection(db, 'products'), limit(250));
+      q = query(collection(db, 'products'), limit(200));
     }
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -251,6 +255,7 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
   }, [isSeller, currentSellerId]);
 
   useEffect(() => {
+    if (isQuotaExceeded()) return;
     const fetchSellers = async () => {
       try {
         const q = query(collection(db, 'sellers'), orderBy('name', 'asc'));

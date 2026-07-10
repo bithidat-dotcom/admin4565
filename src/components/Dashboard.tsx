@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { db, handleFirestoreError, OperationType, isQuotaExceeded } from '../lib/firebase';
 import { collection, onSnapshot, query, orderBy, limit, getDocs, where, or } from 'firebase/firestore';
 import Header from '../components/Header';
 import LoadingDots from './LoadingDots';
@@ -96,6 +96,10 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
   });
 
   useEffect(() => {
+    if (isQuotaExceeded()) {
+      setLoading(false);
+      return;
+    }
     // Helper to get stats from cache
     const loadCache = async () => {
       const cachedStats = Storage.getSmall<any>('dashboard_stats_cache');
@@ -128,10 +132,10 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
           where('seller_id', '==', currentSellerId),
           where('seller', '==', currentSellerName)
         ),
-        limit(200)
+        limit(50)
       );
     } else {
-      qOrders = query(collection(db, 'orders'), limit(300));
+      qOrders = query(collection(db, 'orders'), limit(100));
     }
 
     const unsubscribeOrders = onSnapshot(qOrders, (snapshot) => {
@@ -170,8 +174,8 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
     
     const productCol = collection(db, 'products');
     const qProducts = (isSeller && !isShowingGlobal) 
-      ? query(productCol, or(where('seller_id', '==', currentSellerId), where('seller', '==', currentSellerName)), limit(300)) 
-      : query(productCol, limit(500));
+      ? query(productCol, or(where('seller_id', '==', currentSellerId), where('seller', '==', currentSellerName)), limit(50)) 
+      : query(productCol, limit(100));
 
     const unsubscribeProducts = onSnapshot(qProducts, (snapshot) => {
       const pList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[];

@@ -51,7 +51,13 @@ export interface FirestoreErrorInfo {
 export function handleFirestoreError(error: any, operationType: OperationType, path: string | null) {
   const isQuotaError = error?.code === 'resource-exhausted' || 
                        error?.message?.includes('Quota limit exceeded') ||
-                       (typeof error === 'string' && error.includes('Quota limit exceeded'));
+                       (typeof error === 'string' && error.includes('Quota limit exceeded')) ||
+                       error?.code === '8' || // Some environments report it this way
+                       error?.message?.includes('exhausted');
+
+  if (isQuotaError) {
+    localStorage.setItem('firestore_quota_exceeded_date', new Date().toDateString());
+  }
 
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
@@ -98,8 +104,15 @@ export function handleFirestoreError(error: any, operationType: OperationType, p
   throw new Error(JSON.stringify(errInfo));
 }
 
+export function isQuotaExceeded() {
+  const savedDate = localStorage.getItem('firestore_quota_exceeded_date');
+  if (!savedDate) return false;
+  return savedDate === new Date().toDateString();
+}
+
 // Validation connection as per skill instructions
 async function testConnection() {
+  if (isQuotaExceeded()) return;
   try {
     await getDocFromServer(doc(db, 'test', 'connection'));
   } catch (error) {

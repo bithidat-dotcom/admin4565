@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { db, handleFirestoreError, OperationType, isQuotaExceeded } from '../lib/firebase';
 import { collection, onSnapshot, query, orderBy, deleteDoc, doc, where, updateDoc, limit } from 'firebase/firestore';
 import { User, Order, View } from '../types';
 import Header from '../components/Header';
@@ -55,6 +55,10 @@ export default function UsersPage({ onViewChange }: UsersPageProps) {
   };
 
   useEffect(() => {
+    if (isQuotaExceeded()) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     
     // 0. Load cache for instant display
@@ -72,7 +76,7 @@ export default function UsersPage({ onViewChange }: UsersPageProps) {
     loadCache();
 
     // 1. Listen to registered users (limited)
-    const unsubUsers = onSnapshot(query(collection(db, 'users'), limit(300)), (usersSnap) => {
+    const unsubUsers = onSnapshot(query(collection(db, 'users'), limit(150)), (usersSnap) => {
       const usersList = usersSnap.docs
         .filter(doc => doc.data().is_hidden !== true)
         .map(doc => {
@@ -112,7 +116,7 @@ export default function UsersPage({ onViewChange }: UsersPageProps) {
     });
 
     // 2. Listen to orders (limited)
-    const unsubOrders = onSnapshot(query(collection(db, 'orders'), limit(300), orderBy('created_at', 'desc')), (ordersSnap) => {
+    const unsubOrders = onSnapshot(query(collection(db, 'orders'), limit(150), orderBy('created_at', 'desc')), (ordersSnap) => {
       const ordersList = ordersSnap.docs.map(doc => {
         const rawData = doc.data();
         return {

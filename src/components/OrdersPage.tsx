@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { db, handleFirestoreError, OperationType, isQuotaExceeded } from '../lib/firebase';
 import { collection, onSnapshot, query, orderBy, updateDoc, deleteDoc, doc, where, getDocs, limit, or, addDoc, serverTimestamp } from 'firebase/firestore';
 import { Order, Product } from '../types';
 import Header from '../components/Header';
@@ -63,6 +63,10 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
   const [sellerSearch, setSellerSearch] = useState('');
 
   useEffect(() => {
+    if (isQuotaExceeded()) {
+      setLoading(false);
+      return;
+    }
     // 0. Load cache for instant display
     const loadCache = async () => {
       const cachedOrders = await Storage.getLarge<Order[]>('orders_page_cache');
@@ -86,7 +90,7 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
           where('seller_id', '==', currentSellerId),
           where('seller', '==', currentSellerName)
         ),
-        limit(500)
+        limit(100)
       );
     } else if (sellerSearch.trim()) {
       // Admin searching for specific seller orders
@@ -95,10 +99,10 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
       q = query(
         collection(db, 'orders'),
         where('seller_id', '==', searchLower),
-        limit(500)
+        limit(100)
       );
     } else {
-      q = query(collection(db, 'orders'), limit(250));
+      q = query(collection(db, 'orders'), limit(150));
     }
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -146,7 +150,7 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
 
     const fetchProducts = async () => {
       try {
-        const q = query(collection(db, 'products'), limit(500));
+        const q = query(collection(db, 'products'), limit(150));
         const snapshot = await getDocs(q);
         setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Product));
       } catch (err) {
