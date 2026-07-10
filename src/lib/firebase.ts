@@ -56,7 +56,7 @@ export function handleFirestoreError(error: any, operationType: OperationType, p
                        error?.message?.includes('exhausted');
 
   if (isQuotaError) {
-    localStorage.setItem('firestore_quota_exceeded_date', new Date().toDateString());
+    // localStorage.setItem('firestore_quota_exceeded_date', new Date().toDateString());
   }
 
   const errInfo: FirestoreErrorInfo = {
@@ -107,7 +107,7 @@ export function handleFirestoreError(error: any, operationType: OperationType, p
 export function isQuotaExceeded() {
   const savedDate = localStorage.getItem('firestore_quota_exceeded_date');
   if (!savedDate) return false;
-  return savedDate === new Date().toDateString();
+  return false;
 }
 
 // Validation connection as per skill instructions
