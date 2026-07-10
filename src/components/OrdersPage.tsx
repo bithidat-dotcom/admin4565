@@ -6,7 +6,7 @@ import Header from '../components/Header';
 import Modal from './Modal';
 import OrderTableView from './OrderTableView';
 import LoadingDots from './LoadingDots';
-import { Loader2, Phone, MapPin, Package, Clock, CheckCircle, Search, Trash2, ShieldCheck, Lock, Copy, Check, MessageSquare, Store, ShoppingBag, Truck, Coins, Printer, MoreVertical } from 'lucide-react';
+import { Loader2, Phone, MapPin, Package, Clock, CheckCircle, Search, Trash2, ShieldCheck, Lock, Copy, Check, MessageSquare, Store, ShoppingBag, Truck, Coins, Printer, MoreVertical, Sparkles } from 'lucide-react';
 import { formatCurrency, cn, exportToCSV } from '../lib/utils';
 import { Storage } from '../lib/storage';
 import { format, isSameDay } from 'date-fns';
@@ -46,6 +46,8 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
     area: '',
     post_code: '',
     product_id: '',
+    custom_product_name: '',
+    custom_price: '',
     quantity: 1,
     delivery_charge: 120
   });
@@ -336,30 +338,35 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
     setSubmittingOrder(true);
 
     const selectedProduct = products.find(p => p.id === newOrderData.product_id);
-    if (!selectedProduct) {
-      alert("Please select a valid product");
+    
+    if (!selectedProduct && !newOrderData.custom_product_name) {
+      alert("Please select a product or enter a custom product name");
       setSubmittingOrder(false);
       return;
     }
 
     try {
+      const productName = selectedProduct ? selectedProduct.name : newOrderData.custom_product_name;
+      const productPrice = selectedProduct ? selectedProduct.price : Number(newOrderData.custom_price || 0);
+      const productImage = selectedProduct ? selectedProduct.image : 'https://i.postimg.cc/KvqR53hq/download-(1).png';
+      
       const orderPayload = {
         customer_name: encryptData(newOrderData.customer_name),
         whatsapp_number: encryptData(newOrderData.whatsapp_number),
         location: encryptData(newOrderData.location),
         area: encryptData(newOrderData.area),
         post_code: encryptData(newOrderData.post_code),
-        product_details: encryptData(selectedProduct.name),
-        product_name: selectedProduct.name,
-        product_image: selectedProduct.image,
-        price: selectedProduct.price,
+        product_details: encryptData(productName),
+        product_name: productName,
+        product_image: productImage,
+        price: productPrice,
         quantity: newOrderData.quantity,
         delivery_charge: newOrderData.delivery_charge,
         status: 'pending',
-        seller: isSeller ? currentSellerName : (selectedProduct.seller || 'pbazar Official'),
-        seller_id: isSeller ? currentSellerId : (selectedProduct.seller_id || ''),
-        seller_logo: selectedProduct.seller_logo || '',
-        seller_whatsapp: selectedProduct.seller_whatsapp || '',
+        seller: isSeller ? currentSellerName : (selectedProduct?.seller || 'pbazar Official'),
+        seller_id: isSeller ? currentSellerId : (selectedProduct?.seller_id || ''),
+        seller_logo: selectedProduct?.seller_logo || '',
+        seller_whatsapp: selectedProduct?.seller_whatsapp || '',
         created_at: serverTimestamp()
       };
 
@@ -372,6 +379,8 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
         area: '',
         post_code: '',
         product_id: '',
+        custom_product_name: '',
+        custom_price: '',
         quantity: 1,
         delivery_charge: 120
       });
@@ -380,6 +389,28 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
     } finally {
       setSubmittingOrder(false);
     }
+  };
+
+  const fillDemoData = () => {
+    const demoNames = ['Arif Ahmed', 'Sumaiya Islam', 'Rakib Hasan', 'Nusrat Jahan'];
+    const demoLocations = ['House 12, Road 5, Dhanmondi', 'Flat 4B, Sector 7, Uttara', 'Mirpur 10, Block C', 'Banani 11, Plot 88'];
+    const demoAreas = ['Dhaka', 'Chittagong', 'Sylhet', 'Rajshahi'];
+    
+    const randomIdx = Math.floor(Math.random() * 4);
+    const randomProduct = products.length > 0 ? products[Math.floor(Math.random() * products.length)].id : '';
+
+    setNewOrderData({
+      customer_name: demoNames[randomIdx],
+      whatsapp_number: `017${Math.floor(10000000 + Math.random() * 90000000)}`,
+      location: demoLocations[randomIdx],
+      area: demoAreas[randomIdx],
+      post_code: `${1000 + Math.floor(Math.random() * 9000)}`,
+      product_id: randomProduct,
+      custom_product_name: '',
+      custom_price: '',
+      quantity: 1 + Math.floor(Math.random() * 3),
+      delivery_charge: 120
+    });
   };
 
   const getStatusColor = (status: Order['status']) => {
@@ -406,7 +437,7 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
 
       <main className="p-4 md:p-8">
         {/* Quick Stats Summary Box */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 mb-8">
           <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-all">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Volume</p>
             <div className="flex items-center gap-3">
@@ -454,6 +485,14 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
                 <p className="text-[9px] font-bold text-slate-400 uppercase">Revenue Stream</p>
               </div>
             </div>
+          </div>
+          <div className="bg-brand p-6 rounded-3xl shadow-xl shadow-brand/20 hover:shadow-brand/30 transition-all cursor-pointer group" onClick={() => setIsAddModalOpen(true)}>
+             <div className="flex items-center justify-between mb-2">
+                <Sparkles className="w-5 h-5 text-white/80 group-hover:rotate-12 transition-transform" />
+                <span className="text-[8px] font-black bg-white/20 text-white px-2 py-0.5 rounded-full uppercase tracking-widest">Demo System</span>
+             </div>
+             <p className="text-sm font-black text-white uppercase tracking-wider">Quick Demo Order</p>
+             <p className="text-[9px] text-white/60 font-bold uppercase mt-1">Add sample data instantly</p>
           </div>
         </div>
 
@@ -540,7 +579,14 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
         ) : (
           <div className="space-y-4">
             {isTableView ? (
-              <OrderTableView orders={filteredOrders} onStatusChange={updateStatus} statusUpdatingId={statusUpdatingId} />
+              <OrderTableView 
+                orders={filteredOrders} 
+                onStatusChange={updateStatus} 
+                statusUpdatingId={statusUpdatingId}
+                selectedOrders={selectedOrders}
+                onToggleSelection={toggleSelection}
+                onSelectAll={selectAll}
+              />
             ) : (
                 <AnimatePresence mode="popLayout">
                   {filteredOrders.map((order) => (
@@ -828,6 +874,20 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
         onClose={() => setIsAddModalOpen(false)}
         title="Create Manual Order"
       >
+        <div className="mb-6 flex items-center justify-between bg-brand/5 p-4 rounded-2xl border border-brand/10">
+          <div>
+            <p className="text-[10px] font-black text-brand uppercase tracking-widest">Demo System Active</p>
+            <p className="text-[9px] text-slate-500 font-bold uppercase mt-0.5">Use sample data for presentation</p>
+          </div>
+          <button 
+            type="button"
+            onClick={fillDemoData}
+            className="px-4 py-2 bg-brand text-white text-[10px] font-black uppercase tracking-widest rounded-xl shadow-lg shadow-brand/20 active:scale-95 transition-all"
+          >
+            Fill Demo Data
+          </button>
+        </div>
+
         <form onSubmit={handleCreateOrder} className="space-y-4">
           <div className="space-y-1.5">
             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Customer Name</label>
@@ -889,21 +949,57 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-4 p-4 bg-slate-50/50 rounded-2xl border border-slate-100">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Product</label>
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center justify-between">
+                <span>Select Existing Product</span>
+                <span className="text-[8px] font-bold text-slate-400">(Optional)</span>
+              </label>
               <select
-                required
                 value={newOrderData.product_id}
-                onChange={e => setNewOrderData({...newOrderData, product_id: e.target.value})}
-                className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-brand text-xs font-bold"
+                onChange={e => setNewOrderData({...newOrderData, product_id: e.target.value, custom_product_name: '', custom_price: ''})}
+                className="w-full px-4 py-2.5 rounded-xl bg-white border border-slate-200 focus:outline-none focus:border-brand text-xs font-bold transition-all"
               >
-                <option value="">Select Product</option>
+                <option value="">Choose from inventory...</option>
                 {products.map(p => (
                   <option key={p.id} value={p.id}>{p.name} - {formatCurrency(p.price)}</option>
                 ))}
               </select>
             </div>
+
+            <div className="relative py-2 flex items-center">
+              <div className="flex-grow border-t border-slate-200"></div>
+              <span className="flex-shrink mx-4 text-[8px] font-black text-slate-400 uppercase tracking-[0.2em]">OR ENTER MANUALLY</span>
+              <div className="flex-grow border-t border-slate-200"></div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Product Name</label>
+                <input
+                  type="text"
+                  disabled={!!newOrderData.product_id}
+                  value={newOrderData.custom_product_name}
+                  onChange={e => setNewOrderData({...newOrderData, custom_product_name: e.target.value})}
+                  className="w-full px-4 py-2.5 rounded-xl bg-white border border-slate-200 focus:outline-none focus:border-brand text-xs font-bold disabled:opacity-50 disabled:bg-slate-100 transition-all"
+                  placeholder="e.g. Premium Cotton T-Shirt"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Unit Price (৳)</label>
+                <input
+                  type="number"
+                  disabled={!!newOrderData.product_id}
+                  value={newOrderData.custom_price}
+                  onChange={e => setNewOrderData({...newOrderData, custom_price: e.target.value})}
+                  className="w-full px-4 py-2.5 rounded-xl bg-white border border-slate-200 focus:outline-none focus:border-brand text-xs font-bold disabled:opacity-50 disabled:bg-slate-100 transition-all"
+                  placeholder="0.00"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Quantity</label>
               <input
@@ -911,22 +1007,22 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
                 type="number"
                 min="1"
                 value={newOrderData.quantity}
-                onChange={e => setNewOrderData({...newOrderData, quantity: parseInt(e.target.value)})}
+                onChange={e => setNewOrderData({...newOrderData, quantity: parseInt(e.target.value) || 1})}
                 className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-brand text-xs font-bold"
               />
             </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Delivery Charge (৳)</label>
-            <input
-              required
-              type="number"
-              value={newOrderData.delivery_charge}
-              onChange={e => setNewOrderData({...newOrderData, delivery_charge: parseFloat(e.target.value)})}
-              className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-brand text-xs font-bold"
-            />
-            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-tight">Default is 120 Taka</p>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Delivery Charge (৳)</label>
+              <input
+                required
+                type="number"
+                min="0"
+                value={newOrderData.delivery_charge}
+                onChange={e => setNewOrderData({...newOrderData, delivery_charge: parseFloat(e.target.value) || 0})}
+                className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-brand text-xs font-bold"
+              />
+              <p className="text-[8px] font-bold text-slate-400 uppercase tracking-tight">Default is 120 Taka</p>
+            </div>
           </div>
 
           <button

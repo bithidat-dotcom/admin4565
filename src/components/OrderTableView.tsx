@@ -9,9 +9,12 @@ interface OrderTableViewProps {
   orders: Order[];
   onStatusChange: (id: string, status: Order['status']) => void;
   statusUpdatingId: string | null;
+  selectedOrders: Set<string>;
+  onToggleSelection: (id: string) => void;
+  onSelectAll: () => void;
 }
 
-export default function OrderTableView({ orders, onStatusChange, statusUpdatingId }: OrderTableViewProps) {
+export default function OrderTableView({ orders, onStatusChange, statusUpdatingId, selectedOrders, onToggleSelection, onSelectAll }: OrderTableViewProps) {
   const getStatusColor = (status: Order['status']) => {
     switch (status) {
       case 'pending': return 'bg-amber-100/80 text-amber-800 border border-amber-200/50';
@@ -31,6 +34,14 @@ export default function OrderTableView({ orders, onStatusChange, statusUpdatingI
         <table className="w-full text-left border-collapse table-auto min-w-[800px]">
           <thead>
             <tr className="bg-slate-50/70 border-b border-slate-100">
+              <th className="px-3 py-3 w-10">
+                <input 
+                  type="checkbox"
+                  className="w-4 h-4 rounded border-slate-300 text-brand focus:ring-brand cursor-pointer"
+                  checked={orders.length > 0 && selectedOrders.size === orders.length}
+                  onChange={onSelectAll}
+                />
+              </th>
               <th className="px-3 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest">SL</th>
               <th className="px-3 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest">Ordered At</th>
               <th className="px-3 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest">User / Contact</th>
@@ -45,7 +56,15 @@ export default function OrderTableView({ orders, onStatusChange, statusUpdatingI
           </thead>
           <tbody className="divide-y divide-slate-100">
             {orders.map((order, index) => (
-              <tr key={order.id} className="group hover:bg-slate-50/50 transition-colors">
+              <tr key={order.id} className={cn("group hover:bg-slate-50/50 transition-colors", selectedOrders.has(order.id) && "bg-brand/5")}>
+                <td className="px-3 py-4">
+                  <input 
+                    type="checkbox"
+                    className="w-4 h-4 rounded border-slate-300 text-brand focus:ring-brand cursor-pointer"
+                    checked={selectedOrders.has(order.id)}
+                    onChange={() => onToggleSelection(order.id)}
+                  />
+                </td>
                 <td className="px-3 py-4 text-xs text-slate-500 font-bold">{index + 1}</td>
                 <td className="px-3 py-4">
                   <div className="text-[10px] font-black text-slate-900 uppercase">{order.created_at ? format(new Date(order.created_at), 'dd MMM yyyy') : 'N/A'}</div>

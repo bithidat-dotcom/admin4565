@@ -295,6 +295,15 @@ export default function App() {
 
     return (
       <div className={cn("min-h-screen font-sans text-slate-900 selection:bg-brand-light selection:text-brand-dark transition-colors duration-500", themeClasses[theme])}>
+        {quotaError && (
+          <div className="fixed top-0 left-0 right-0 z-[9999] bg-rose-600 text-white p-3 flex items-center justify-center gap-3 text-xs font-black uppercase tracking-widest shadow-2xl animate-in slide-in-from-top duration-500">
+            <AlertCircle className="w-4 h-4" />
+            <span>Daily Database Quota Exceeded. Some live features are temporarily disabled.</span>
+            <button onClick={() => setQuotaError(false)} className="ml-4 p-1 hover:bg-white/20 rounded-lg">
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        )}
         <PopupAd />                
         <Sidebar 
           currentView={currentView} 
