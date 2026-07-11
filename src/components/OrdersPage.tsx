@@ -6,7 +6,7 @@ import Header from '../components/Header';
 import Modal from './Modal';
 import OrderTableView from './OrderTableView';
 import LoadingDots from './LoadingDots';
-import { Loader2, Phone, MapPin, Package, Clock, CheckCircle, Search, Trash2, ShieldCheck, Lock, Copy, Check, MessageSquare, Store, ShoppingBag, Truck, Coins, Printer, MoreVertical, Sparkles } from 'lucide-react';
+import { Loader2, Phone, MapPin, Package, Clock, CheckCircle, Search, Trash2, ShieldCheck, Lock, Copy, Check, MessageSquare, Store, ShoppingBag, Truck, Coins, Printer, MoreVertical, Sparkles, Minus, PlusCircle } from 'lucide-react';
 import { formatCurrency, cn, exportToCSV } from '../lib/utils';
 import { Storage } from '../lib/storage';
 import { format, isSameDay } from 'date-fns';
@@ -45,12 +45,37 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
     location: '',
     area: '',
     post_code: '',
-    product_id: '',
-    custom_product_name: '',
-    custom_price: '',
-    quantity: 1,
+    seller_name: '',
+    items: [{ product_id: '', custom_product_name: '', custom_price: '', quantity: 1 }],
     delivery_charge: 120
   });
+
+  const addItem = () => {
+    setNewOrderData({
+      ...newOrderData,
+      items: [...newOrderData.items, { product_id: '', custom_product_name: '', custom_price: '', quantity: 1 }]
+    });
+  };
+
+  const removeItem = (index: number) => {
+    if (newOrderData.items.length <= 1) return;
+    const newItems = [...newOrderData.items];
+    newItems.splice(index, 1);
+    setNewOrderData({ ...newOrderData, items: newItems });
+  };
+
+  const updateItem = (index: number, field: string, value: any) => {
+    const newItems = [...newOrderData.items];
+    newItems[index] = { ...newItems[index], [field]: value };
+    
+    // If selecting a product, clear custom fields
+    if (field === 'product_id' && value) {
+      newItems[index].custom_product_name = '';
+      newItems[index].custom_price = '';
+    }
+    
+    setNewOrderData({ ...newOrderData, items: newItems });
+  };
   const [submittingOrder, setSubmittingOrder] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [sellers, setSellers] = useState<Record<string, any>>({});
@@ -337,36 +362,47 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
     e.preventDefault();
     setSubmittingOrder(true);
 
-    const selectedProduct = products.find(p => p.id === newOrderData.product_id);
+    const validItems = newOrderData.items.filter(item => item.product_id || item.custom_product_name);
     
-    if (!selectedProduct && !newOrderData.custom_product_name) {
-      alert("Please select a product or enter a custom product name");
+    if (validItems.length === 0) {
+      alert("Please add at least one product");
       setSubmittingOrder(false);
       return;
     }
 
     try {
-      const productName = selectedProduct ? selectedProduct.name : newOrderData.custom_product_name;
-      const productPrice = selectedProduct ? selectedProduct.price : Number(newOrderData.custom_price || 0);
-      const productImage = selectedProduct ? selectedProduct.image : 'https://i.postimg.cc/KvqR53hq/download-(1).png';
-      
+      // Process all items
+      const processedItems = validItems.map(item => {
+        const selectedProduct = products.find(p => p.id === item.product_id);
+        return {
+          name: selectedProduct ? selectedProduct.name : item.custom_product_name,
+          price: selectedProduct ? selectedProduct.price : Number(item.custom_price || 0),
+          quantity: item.quantity,
+          image: selectedProduct ? selectedProduct.image : 'https://i.postimg.cc/KvqR53hq/download-(1).png',
+          seller: isSeller ? currentSellerName : (newOrderData.seller_name || selectedProduct?.seller || 'pbazar Official'),
+          seller_id: isSeller ? currentSellerId : (selectedProduct?.seller_id || '')
+        };
+      });
+
+      const totalProductPrice = processedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      const combinedNames = processedItems.map(item => `${item.name} (x${item.quantity})`).join(', ');
+
       const orderPayload = {
         customer_name: encryptData(newOrderData.customer_name),
         whatsapp_number: encryptData(newOrderData.whatsapp_number),
         location: encryptData(newOrderData.location),
         area: encryptData(newOrderData.area),
         post_code: encryptData(newOrderData.post_code),
-        product_details: encryptData(productName),
-        product_name: productName,
-        product_image: productImage,
-        price: productPrice,
-        quantity: newOrderData.quantity,
+        product_details: encryptData(combinedNames),
+        product_name: processedItems[0].name + (processedItems.length > 1 ? ` (+${processedItems.length - 1} more)` : ''),
+        product_image: processedItems[0].image,
+        price: totalProductPrice / (processedItems.reduce((sum, item) => sum + item.quantity, 0) || 1),
+        quantity: processedItems.reduce((sum, item) => sum + item.quantity, 0),
         delivery_charge: newOrderData.delivery_charge,
         status: 'pending',
-        seller: isSeller ? currentSellerName : (selectedProduct?.seller || 'pbazar Official'),
-        seller_id: isSeller ? currentSellerId : (selectedProduct?.seller_id || ''),
-        seller_logo: selectedProduct?.seller_logo || '',
-        seller_whatsapp: selectedProduct?.seller_whatsapp || '',
+        seller: processedItems[0].seller,
+        seller_id: processedItems[0].seller_id,
+        items: processedItems,
         created_at: serverTimestamp()
       };
 
@@ -378,10 +414,8 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
         location: '',
         area: '',
         post_code: '',
-        product_id: '',
-        custom_product_name: '',
-        custom_price: '',
-        quantity: 1,
+        seller_name: '',
+        items: [{ product_id: '', custom_product_name: '', custom_price: '', quantity: 1 }],
         delivery_charge: 120
       });
     } catch (err: any) {
@@ -399,18 +433,66 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
     const randomIdx = Math.floor(Math.random() * 4);
     const randomProduct = products.length > 0 ? products[Math.floor(Math.random() * products.length)].id : '';
 
+    const demoSellers = ['Style Hub', 'ElectroWorld', 'Fashion Nova BD', 'Gaget Zone', 'Daily Mart'];
+    
     setNewOrderData({
       customer_name: demoNames[randomIdx],
       whatsapp_number: `017${Math.floor(10000000 + Math.random() * 90000000)}`,
       location: demoLocations[randomIdx],
       area: demoAreas[randomIdx],
       post_code: `${1000 + Math.floor(Math.random() * 9000)}`,
-      product_id: randomProduct,
-      custom_product_name: '',
-      custom_price: '',
-      quantity: 1 + Math.floor(Math.random() * 3),
+      seller_name: demoSellers[Math.floor(Math.random() * demoSellers.length)],
+      items: [{ 
+        product_id: randomProduct, 
+        custom_product_name: '', 
+        custom_price: '', 
+        quantity: 1 + Math.floor(Math.random() * 2) 
+      }],
       delivery_charge: 120
     });
+  };
+
+  const handleDownloadPreview = async () => {
+    const validItems = newOrderData.items.filter(item => item.product_id || item.custom_product_name);
+    
+    if (validItems.length === 0) {
+      alert("Please add at least one product first.");
+      return;
+    }
+
+    const { generateInvoicePDF } = await import('../lib/printing');
+    
+    const processedItems = validItems.map(item => {
+      const selectedProduct = products.find(p => p.id === item.product_id);
+      return {
+        name: selectedProduct ? selectedProduct.name : item.custom_product_name,
+        price: selectedProduct ? selectedProduct.price : Number(item.custom_price || 0),
+        quantity: item.quantity,
+        seller: isSeller ? currentSellerName : (selectedProduct?.seller || 'pbazar Official')
+      };
+    });
+
+    const totalProductPrice = processedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const combinedNames = processedItems.map(item => `${item.name} (x${item.quantity})`).join(', ');
+
+    const tempOrder = {
+      id: 'PREVIEW-' + Math.random().toString(36).substr(2, 9).toUpperCase(),
+      customer_name: newOrderData.customer_name || 'Walking Customer',
+      whatsapp_number: newOrderData.whatsapp_number || '01XXXXXXXXX',
+      location: newOrderData.location || 'N/A',
+      area: newOrderData.area || 'N/A',
+      post_code: newOrderData.post_code || 'N/A',
+      product_name: combinedNames,
+      price: totalProductPrice / processedItems.reduce((sum, i) => sum + i.quantity, 0), // Average price per unit for the simple PDF template
+      quantity: processedItems.reduce((sum, item) => sum + item.quantity, 0),
+      delivery_charge: newOrderData.delivery_charge,
+      status: 'pending' as const,
+      seller: processedItems[0].seller,
+      items: processedItems,
+      created_at: new Date().toISOString()
+    };
+
+    generateInvoicePDF(tempOrder);
   };
 
   const getStatusColor = (status: Order['status']) => {
@@ -874,18 +956,28 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
         onClose={() => setIsAddModalOpen(false)}
         title="Create Manual Order"
       >
-        <div className="mb-6 flex items-center justify-between bg-brand/5 p-4 rounded-2xl border border-brand/10">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-4 bg-brand/5 p-4 rounded-2xl border border-brand/10">
           <div>
             <p className="text-[10px] font-black text-brand uppercase tracking-widest">Demo System Active</p>
             <p className="text-[9px] text-slate-500 font-bold uppercase mt-0.5">Use sample data for presentation</p>
           </div>
-          <button 
-            type="button"
-            onClick={fillDemoData}
-            className="px-4 py-2 bg-brand text-white text-[10px] font-black uppercase tracking-widest rounded-xl shadow-lg shadow-brand/20 active:scale-95 transition-all"
-          >
-            Fill Demo Data
-          </button>
+          <div className="flex items-center gap-2">
+            <button 
+              type="button"
+              onClick={handleDownloadPreview}
+              className="px-4 py-2 bg-white text-slate-700 border border-slate-200 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-slate-50 transition-all flex items-center gap-2"
+            >
+              <Printer className="w-3 h-3" />
+              Download PDF
+            </button>
+            <button 
+              type="button"
+              onClick={fillDemoData}
+              className="px-4 py-2 bg-brand text-white text-[10px] font-black uppercase tracking-widest rounded-xl shadow-lg shadow-brand/20 active:scale-95 transition-all"
+            >
+              Fill Demo Data
+            </button>
+          </div>
         </div>
 
         <form onSubmit={handleCreateOrder} className="space-y-4">
@@ -925,7 +1017,7 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="space-y-1.5">
               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Area / City</label>
               <input
@@ -947,55 +1039,97 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
                 placeholder="Optional"
               />
             </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Seller Name</label>
+              <input
+                type="text"
+                value={newOrderData.seller_name}
+                onChange={e => setNewOrderData({...newOrderData, seller_name: e.target.value})}
+                className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-brand text-xs font-bold"
+                placeholder="Shop Name"
+              />
+            </div>
           </div>
 
-          <div className="space-y-4 p-4 bg-slate-50/50 rounded-2xl border border-slate-100">
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center justify-between">
-                <span>Select Existing Product</span>
-                <span className="text-[8px] font-bold text-slate-400">(Optional)</span>
-              </label>
-              <select
-                value={newOrderData.product_id}
-                onChange={e => setNewOrderData({...newOrderData, product_id: e.target.value, custom_product_name: '', custom_price: ''})}
-                className="w-full px-4 py-2.5 rounded-xl bg-white border border-slate-200 focus:outline-none focus:border-brand text-xs font-bold transition-all"
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Order Items</label>
+              <button 
+                type="button" 
+                onClick={addItem}
+                className="flex items-center gap-1.5 text-brand hover:text-brand-dark transition-colors"
               >
-                <option value="">Choose from inventory...</option>
-                {products.map(p => (
-                  <option key={p.id} value={p.id}>{p.name} - {formatCurrency(p.price)}</option>
-                ))}
-              </select>
+                <PlusCircle className="w-4 h-4" />
+                <span className="text-[10px] font-black uppercase tracking-widest">Add Product</span>
+              </button>
             </div>
 
-            <div className="relative py-2 flex items-center">
-              <div className="flex-grow border-t border-slate-200"></div>
-              <span className="flex-shrink mx-4 text-[8px] font-black text-slate-400 uppercase tracking-[0.2em]">OR ENTER MANUALLY</span>
-              <div className="flex-grow border-t border-slate-200"></div>
-            </div>
+            <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+              {newOrderData.items.map((item, index) => (
+                <div key={index} className="p-4 bg-slate-50/50 rounded-2xl border border-slate-100 relative group/item">
+                  {newOrderData.items.length > 1 && (
+                    <button 
+                      type="button"
+                      onClick={() => removeItem(index)}
+                      className="absolute -top-2 -right-2 w-6 h-6 bg-rose-500 text-white rounded-full flex items-center justify-center shadow-lg opacity-0 group-hover/item:opacity-100 transition-all z-10"
+                    >
+                      <Minus className="w-3 h-3" />
+                    </button>
+                  )}
+                  
+                  <div className="grid grid-cols-1 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Select Product</label>
+                      <select
+                        value={item.product_id}
+                        onChange={e => updateItem(index, 'product_id', e.target.value)}
+                        className="w-full px-4 py-2.5 rounded-xl bg-white border border-slate-200 focus:outline-none focus:border-brand text-xs font-bold"
+                      >
+                        <option value="">Choose from inventory...</option>
+                        {products.map(p => (
+                          <option key={p.id} value={p.id}>{p.name} - {formatCurrency(p.price)}</option>
+                        ))}
+                      </select>
+                    </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Product Name</label>
-                <input
-                  type="text"
-                  disabled={!!newOrderData.product_id}
-                  value={newOrderData.custom_product_name}
-                  onChange={e => setNewOrderData({...newOrderData, custom_product_name: e.target.value})}
-                  className="w-full px-4 py-2.5 rounded-xl bg-white border border-slate-200 focus:outline-none focus:border-brand text-xs font-bold disabled:opacity-50 disabled:bg-slate-100 transition-all"
-                  placeholder="e.g. Premium Cotton T-Shirt"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Unit Price (৳)</label>
-                <input
-                  type="number"
-                  disabled={!!newOrderData.product_id}
-                  value={newOrderData.custom_price}
-                  onChange={e => setNewOrderData({...newOrderData, custom_price: e.target.value})}
-                  className="w-full px-4 py-2.5 rounded-xl bg-white border border-slate-200 focus:outline-none focus:border-brand text-xs font-bold disabled:opacity-50 disabled:bg-slate-100 transition-all"
-                  placeholder="0.00"
-                />
-              </div>
+                    {!item.product_id && (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Custom Name</label>
+                          <input
+                            type="text"
+                            value={item.custom_product_name}
+                            onChange={e => updateItem(index, 'custom_product_name', e.target.value)}
+                            className="w-full px-4 py-2.5 rounded-xl bg-white border border-slate-200 focus:outline-none focus:border-brand text-xs font-bold"
+                            placeholder="Product name"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Unit Price (৳)</label>
+                          <input
+                            type="number"
+                            value={item.custom_price}
+                            onChange={e => updateItem(index, 'custom_price', e.target.value)}
+                            className="w-full px-4 py-2.5 rounded-xl bg-white border border-slate-200 focus:outline-none focus:border-brand text-xs font-bold"
+                            placeholder="0.00"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="space-y-1.5">
+                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Quantity</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={item.quantity}
+                        onChange={e => updateItem(index, 'quantity', parseInt(e.target.value) || 1)}
+                        className="w-full px-4 py-2.5 rounded-xl bg-white border border-slate-200 focus:outline-none focus:border-brand text-xs font-bold"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 

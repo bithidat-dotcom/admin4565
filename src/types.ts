@@ -33,6 +33,13 @@ export interface Product {
   extra_categories?: string[];
 }
 
+export interface OrderItem {
+  name: string;
+  price: number;
+  quantity: number;
+  seller?: string;
+}
+
 export interface Order {
   id: string;
   customer_name: string;
@@ -54,6 +61,7 @@ export interface Order {
   cancelled_by?: 'user' | 'admin';
   status: 'pending' | 'confirmed' | 'packing' | 'shipping' | 'delivered' | 'completed' | 'cancelled';
   created_at: string;
+  items?: OrderItem[];
 }
 
 export interface Banner {
