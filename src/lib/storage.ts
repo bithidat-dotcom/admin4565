@@ -40,7 +40,7 @@ export const Storage = {
     } catch (error) {
       if (error instanceof Error && error.name === 'QuotaExceededError') {
         console.warn('LocalStorage full, falling back to IndexedDB for small item');
-        this.setLarge(`small_${key}`, value);
+        Storage.setLarge(`small_${key}`, value);
       }
     }
   },
@@ -59,5 +59,41 @@ export const Storage = {
 
   removeSmall(key: string): void {
     localStorage.removeItem(key);
+  },
+
+  // Background Backup System
+  async backupOrders(orders: any[]): Promise<void> {
+    if (!orders || orders.length === 0) return;
+    
+    try {
+      const existingBackup = await Storage.getLarge<any[]>('orders_history_backup') || [];
+      
+      // Merge new orders with existing backup (avoid duplicates by ID)
+      const merged = [...existingBackup];
+      const existingIds = new Set(existingBackup.map(o => o.id));
+      
+      orders.forEach(order => {
+        if (!existingIds.has(order.id)) {
+          merged.push(order);
+        } else {
+          // Update existing order in backup
+          const idx = merged.findIndex(o => o.id === order.id);
+          if (idx !== -1) merged[idx] = order;
+        }
+      });
+
+      // Keep only last 1000 orders in backup to prevent IndexedDB bloat
+      const trimmed = merged.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 1000);
+      
+      await Storage.setLarge('orders_history_backup', trimmed);
+      Storage.setSmall('last_backup_timestamp', new Date().toISOString());
+      console.log('Background order backup completed:', trimmed.length, 'orders');
+    } catch (error) {
+      console.error('Background backup failed:', error);
+    }
+  },
+
+  async getBackupOrders(): Promise<any[]> {
+    return await Storage.getLarge<any[]>('orders_history_backup') || [];
   }
 };

@@ -91,13 +91,125 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
 
   const [sellerSearch, setSellerSearch] = useState('');
 
+  // Live Session States
+  const [sessionId, setSessionId] = useState<string>('');
+  const [activeSession, setActiveSession] = useState<any>(null);
+  const [isJoiningSession, setIsJoiningSession] = useState(false);
+  const [sessionError, setSessionError] = useState<string>('');
+  const [showSessionModal, setShowSessionModal] = useState(false);
+
+  // Sync state TO session when we are the "controller" (simplified as both-way sync)
   useEffect(() => {
-    if (isQuotaExceeded()) return;
+    if (!sessionId || !activeSession) return;
+    
+    const updateSession = async () => {
+      try {
+        await updateDoc(doc(db, 'sessions', sessionId), {
+          searchQuery,
+          statusFilter,
+          lastUpdate: serverTimestamp()
+        });
+      } catch (err) {
+        console.error("Failed to sync state to session:", err);
+      }
+    };
+
+    // Debounce state sync
+    const timer = setTimeout(updateSession, 500);
+    return () => clearTimeout(timer);
+  }, [searchQuery, statusFilter, sessionId, activeSession]);
+
+  // Listen for changes FROM session
+  useEffect(() => {
+    if (!sessionId) return;
+
+    const unsubscribe = onSnapshot(doc(db, 'sessions', sessionId), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setActiveSession(data);
+        
+        // Only update if different to avoid loops
+        if (data.searchQuery !== undefined && data.searchQuery !== searchQuery) {
+          setSearchQuery(data.searchQuery);
+        }
+        if (data.statusFilter !== undefined && data.statusFilter !== statusFilter) {
+          setStatusFilter(data.statusFilter);
+        }
+      } else {
+        setSessionId('');
+        setActiveSession(null);
+        setSessionError('Session has ended.');
+      }
+    });
+
+    return () => unsubscribe();
+  }, [sessionId]);
+
+  const handleCreateSession = async () => {
+    setIsJoiningSession(true);
+    setSessionError('');
+    try {
+      // Generate a fixed 6-digit ID
+      const newId = Math.floor(100000 + Math.random() * 900000).toString();
+      const sessionData = {
+        id: newId,
+        searchQuery: '',
+        statusFilter: 'all',
+        created_at: serverTimestamp(),
+        lastUpdate: serverTimestamp(),
+        createdBy: userSession?.name || 'Admin'
+      };
+      
+      // Use setDoc for fixed ID
+      await updateDoc(doc(db, 'sessions', newId), sessionData).catch(async () => {
+        // If update fails because it doesn't exist, create it (we use setDoc pattern)
+        const { setDoc } = await import('firebase/firestore');
+        await setDoc(doc(db, 'sessions', newId), sessionData);
+      });
+
+      setSessionId(newId);
+      setShowSessionModal(false);
+    } catch (err) {
+      setSessionError('Failed to create session. Please try again.');
+      console.error(err);
+    } finally {
+      setIsJoiningSession(false);
+    }
+  };
+
+  const handleJoinSession = async (id: string) => {
+    if (!id) return;
+    setIsJoiningSession(true);
+    setSessionError('');
+    try {
+      const { getDoc } = await import('firebase/firestore');
+      const docSnap = await getDoc(doc(db, 'sessions', id));
+      if (docSnap.exists()) {
+        setSessionId(id);
+        setShowSessionModal(false);
+      } else {
+        setSessionError('Invalid Connection ID. Please check and try again.');
+      }
+    } catch (err) {
+      setSessionError('Failed to join session.');
+      console.error(err);
+    } finally {
+      setIsJoiningSession(false);
+    }
+  };
+
+  useEffect(() => {
     // 0. Load cache for instant display
     const loadCache = async () => {
       const cachedOrders = await Storage.getLarge<Order[]>('orders_page_cache');
-      if (cachedOrders && !isSeller && !sellerSearch) {
-        setOrders(cachedOrders);
+      const backupOrders = await Storage.getBackupOrders();
+      
+      // Use the best available local data
+      const bestLocalData = cachedOrders && cachedOrders.length > 0 ? cachedOrders : backupOrders;
+      
+      if (bestLocalData.length > 0 && orders.length === 0) {
+        setOrders(bestLocalData);
+        setLoading(false);
       }
       
       const cachedSellers = Storage.getSmall<Record<string, any>>('sellers_map_cache');
@@ -106,6 +218,11 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
       }
     };
     loadCache();
+
+    if (isQuotaExceeded()) {
+      console.warn('Quota exceeded, operating in offline/cache mode');
+      return;
+    }
 
     // 1. Listen to limited set of recent orders (quota saving)
     let q;
@@ -151,6 +268,10 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
       ordersData.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       
       setOrders(ordersData);
+      
+      // Background Backup System
+      Storage.backupOrders(ordersData);
+
       if (!isSeller && !sellerSearch) {
         Storage.setLarge('orders_page_cache', ordersData);
       }
@@ -358,6 +479,33 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
     }
   };
 
+  const [downloadingBackup, setDownloadingBackup] = useState(false);
+
+  const handleDownloadBackup = async () => {
+    setDownloadingBackup(true);
+    try {
+      const backupData = await Storage.getBackupOrders();
+      if (backupData.length === 0) {
+        alert("No backup data found yet. Please wait for orders to sync.");
+        return;
+      }
+      
+      const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `orders_backup_${format(new Date(), 'yyyy-MM-dd_HH-mm')}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Download backup failed:", err);
+    } finally {
+      setDownloadingBackup(false);
+    }
+  };
+
   const handleCreateOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmittingOrder(true);
@@ -483,7 +631,7 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
       area: newOrderData.area || 'N/A',
       post_code: newOrderData.post_code || 'N/A',
       product_name: combinedNames,
-      price: totalProductPrice / processedItems.reduce((sum, i) => sum + i.quantity, 0), // Average price per unit for the simple PDF template
+      price: totalProductPrice, 
       quantity: processedItems.reduce((sum, item) => sum + item.quantity, 0),
       delivery_charge: newOrderData.delivery_charge,
       status: 'pending' as const,
@@ -644,8 +792,110 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
                 className="bg-transparent border-none outline-none text-xs font-black text-slate-700 uppercase tracking-widest w-full"
               />
             </div>
+
+            <button
+              onClick={() => setShowSessionModal(true)}
+              className={cn(
+                "px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition-all shadow-lg",
+                sessionId 
+                  ? "bg-emerald-500 text-white shadow-emerald-500/20" 
+                  : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 shadow-slate-900/5"
+              )}
+            >
+              <Sparkles className={cn("w-3.5 h-3.5", sessionId && "animate-pulse")} />
+              {sessionId ? `Sync: ${sessionId}` : "Live Connect"}
+            </button>
+
+            <button
+              onClick={handleDownloadBackup}
+              disabled={downloadingBackup}
+              className="bg-slate-900 text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/10 disabled:opacity-50"
+            >
+              {downloadingBackup ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <ShieldCheck className="w-3.5 h-3.5" />
+              )}
+              {downloadingBackup ? "Preparing..." : "Backup Data"}
+            </button>
           </div>
-          
+
+          <Modal 
+            isOpen={showSessionModal} 
+            onClose={() => setShowSessionModal(false)}
+            title="Live Connection Sync"
+          >
+            <div className="p-8 space-y-8">
+              <div className="space-y-4">
+                <div className="flex items-center gap-4 p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
+                  <div className="w-12 h-12 rounded-xl bg-emerald-500 flex items-center justify-center text-white shadow-lg shadow-emerald-500/20">
+                    <Sparkles className="w-6 h-6 animate-pulse" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-emerald-950 uppercase tracking-widest">Real-time Frontend Sync</h3>
+                    <p className="text-[10px] text-emerald-700 font-bold leading-relaxed mt-1">Connect multiple devices to share search queries, filters, and live updates instantly using a fixed connection ID.</p>
+                  </div>
+                </div>
+
+                {sessionId ? (
+                  <div className="p-6 bg-slate-50 rounded-2xl border border-slate-200 text-center space-y-4">
+                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Active Connection ID</p>
+                    <div className="text-5xl font-black text-slate-900 tracking-tighter tabular-nums">{sessionId}</div>
+                    <button
+                      onClick={() => setSessionId('')}
+                      className="text-[10px] font-black text-rose-500 uppercase tracking-widest hover:text-rose-600 transition-colors"
+                    >
+                      Disconnect Session
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="p-6 bg-slate-50 rounded-2xl border border-slate-200 flex flex-col items-center justify-center text-center space-y-4">
+                      <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm border border-slate-100">
+                        <PlusCircle className="w-5 h-5 text-slate-400" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest">Start New</h4>
+                        <p className="text-[9px] text-slate-500 font-bold mt-1">Generate a fresh ID for others to join.</p>
+                      </div>
+                      <button
+                        onClick={handleCreateSession}
+                        disabled={isJoiningSession}
+                        className="w-full bg-slate-900 text-white py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 disabled:opacity-50 transition-all"
+                      >
+                        {isJoiningSession ? <Loader2 className="w-3.5 h-3.5 animate-spin mx-auto" /> : "Generate ID"}
+                      </button>
+                    </div>
+
+                    <div className="p-6 bg-white rounded-2xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-center space-y-4">
+                      <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center shadow-sm border border-slate-100">
+                        <Lock className="w-5 h-5 text-slate-400" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest">Join Existing</h4>
+                        <p className="text-[9px] text-slate-500 font-bold mt-1">Enter a 6-digit connection ID.</p>
+                      </div>
+                      <div className="w-full space-y-3">
+                        <input
+                          type="text"
+                          maxLength={6}
+                          placeholder="000000"
+                          className="w-full text-center text-2xl font-black tracking-widest py-2 bg-slate-50 rounded-xl focus:outline-none focus:ring-2 ring-brand"
+                          onChange={(e) => {
+                            if (e.target.value.length === 6) {
+                              handleJoinSession(e.target.value);
+                            }
+                          }}
+                        />
+                        {sessionError && <p className="text-[9px] text-rose-500 font-bold uppercase">{sessionError}</p>}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </Modal>
+
           <div className="bg-white border border-slate-200 rounded-xl px-4 py-2 text-xs text-slate-500 flex items-center gap-2 font-bold uppercase tracking-widest hidden lg:flex">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             Live Shipments Tracked
@@ -783,7 +1033,13 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
                                 </div>
                                 <div className="text-right">
                                   <p className="text-[10px] font-black text-white/30 uppercase tracking-widest mb-1">Grand Total</p>
-                                  <p className="text-3xl font-black text-white tracking-tighter">৳{((order.price || 0) * (Number(order.quantity) || 1) + (order.delivery_charge || 120)).toLocaleString()}</p>
+                                  <p className="text-3xl font-black text-white tracking-tighter">
+                                    ৳{(
+                                      (order.items && order.items.length > 0
+                                        ? order.items.reduce((sum: number, item: any) => sum + (Number(item.price) * (Number(item.quantity) || 1)), 0)
+                                        : (Number(order.price) || 0) * (Number(order.quantity) || 1)) + (Number(order.delivery_charge) || 120)
+                                    ).toLocaleString()}
+                                  </p>
                                   {order.delivery_charge && order.delivery_charge !== 0 && (
                                     <p className="text-[8px] text-white/40 font-bold uppercase mt-1">Inc. ৳{order.delivery_charge} Delivery</p>
                                   )}

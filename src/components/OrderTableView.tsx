@@ -108,10 +108,16 @@ export default function OrderTableView({ orders, onStatusChange, statusUpdatingI
                    <div className="text-xs font-bold text-slate-800 line-clamp-1">{order.seller || 'N/A'}</div>
                    {order.seller_id && <div className="text-[9px] text-indigo-500 font-bold uppercase tracking-tight">ID: {order.seller_id}</div>}
                 </td>
-                <td className="px-3 py-4 text-right">
-                   <div className="text-xs font-black text-slate-900">{formatCurrency(((order.price || 0) * (Number(order.quantity) || 1)) + (order.delivery_charge || 120))}</div>
-                   <div className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter">Inc. ৳{order.delivery_charge || 120} Del</div>
-                </td>
+                 <td className="px-3 py-4 text-right">
+                    <div className="text-xs font-black text-slate-900">
+                      {formatCurrency(
+                        (order.items && order.items.length > 0
+                          ? order.items.reduce((sum, item) => sum + (Number(item.price) * (Number(item.quantity) || 1)), 0)
+                          : (Number(order.price) || 0) * (Number(order.quantity) || 1)) + (Number(order.delivery_charge) || 120)
+                      )}
+                    </div>
+                    <div className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter">Inc. ৳{order.delivery_charge || 120} Del</div>
+                 </td>
                 <td className="px-3 py-4">
                    <select 
                      value={order.status}
