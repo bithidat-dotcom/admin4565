@@ -31,7 +31,8 @@ import {
   Mail,
   Facebook,
   Instagram,
-  Music
+  Music,
+  ShieldCheck
 } from 'lucide-react';
 import ImageUploader from './ImageUploader';
 import { formatCurrency, cn } from '../lib/utils';
@@ -201,20 +202,33 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
   });
 
   useEffect(() => {
-    if (isQuotaExceeded()) return;
-    // Load cache
+    // Load cache and backup for immediate display
     const loadCache = async () => {
-      const cachedProducts = await Storage.getLarge<Product[]>('products_page_cache');
-      if (cachedProducts && !isSeller) {
-        setProducts(cachedProducts);
-      }
-      
-      const cachedSellers = await Storage.getLarge<Seller[]>('sellers_list_cache');
-      if (cachedSellers) {
-        setSellers(cachedSellers);
+      try {
+        const cachedProducts = await Storage.getLarge<Product[]>('products_page_cache');
+        const backupProducts = await Storage.getBackupProducts();
+        
+        const bestLocalProducts = (cachedProducts && cachedProducts.length > 0) ? cachedProducts : backupProducts;
+        
+        if (bestLocalProducts.length > 0) {
+          setProducts(bestLocalProducts);
+          setLoading(false);
+        }
+        
+        const cachedSellers = await Storage.getLarge<Seller[]>('sellers_list_cache');
+        if (cachedSellers) {
+          setSellers(cachedSellers);
+        }
+      } catch (err) {
+        console.warn("Local storage access failed:", err);
       }
     };
     loadCache();
+
+    if (isQuotaExceeded()) {
+      console.warn("Operating in offline/backup mode due to quota limits");
+      return;
+    }
 
     // Limited query to save quota
     let q;
@@ -244,6 +258,7 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
       setProducts(productsData);
       if (!isSeller) {
         Storage.setLarge('products_page_cache', productsData);
+        Storage.backupProducts(productsData);
       }
       setLoading(false);
     }, (error) => {
@@ -382,6 +397,34 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
       // Don't close modal on error so user can retry or see what happened
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const [downloadingBackup, setDownloadingBackup] = useState(false);
+
+  const handleDownloadBackup = async () => {
+    setDownloadingBackup(true);
+    try {
+      const backupData = await Storage.getBackupProducts();
+      if (backupData.length === 0) {
+        alert("No backup data found yet. Data is backed up automatically when you view products.");
+        return;
+      }
+      
+      const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const dateStr = new Date().toISOString().split('T')[0];
+      a.download = `products_backup_${dateStr}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Download backup failed:", err);
+    } finally {
+      setDownloadingBackup(false);
     }
   };
 
@@ -585,6 +628,19 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
           onChange={(e) => setFilterName(e.target.value)}
           className="px-4 py-3 sm:py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 uppercase tracking-widest flex-1 sm:max-w-xs focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none transition-all"
         />
+
+        <button
+          onClick={handleDownloadBackup}
+          disabled={downloadingBackup}
+          className="bg-slate-900 text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/10 disabled:opacity-50"
+        >
+          {downloadingBackup ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          ) : (
+            <ShieldCheck className="w-3.5 h-3.5" />
+          )}
+          {downloadingBackup ? "Preparing..." : "Backup Products"}
+        </button>
         <select 
           value={filterCategory}
           onChange={(e) => setFilterCategory(e.target.value)}

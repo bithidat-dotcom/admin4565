@@ -95,5 +95,20 @@ export const Storage = {
 
   async getBackupOrders(): Promise<any[]> {
     return await Storage.getLarge<any[]>('orders_history_backup') || [];
+  },
+
+  // Product Backup System
+  async backupProducts(products: any[]): Promise<void> {
+    if (!products || products.length === 0) return;
+    try {
+      await Storage.setLarge('products_backup', products);
+      Storage.setSmall('last_products_backup', new Date().toISOString());
+    } catch (error) {
+      console.error('Product backup failed:', error);
+    }
+  },
+
+  async getBackupProducts(): Promise<any[]> {
+    return await Storage.getLarge<any[]>('products_backup') || [];
   }
 };

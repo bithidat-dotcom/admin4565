@@ -78,38 +78,48 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
 
 
   useEffect(() => {
-    if (isQuotaExceeded()) return;
-    const timer = setTimeout(() => {
-      setMounted(true);
-    }, 150);
-    return () => clearTimeout(timer);
+    setMounted(true);
   }, []);
 
   const filteredRecentOrders = recentOrders;
 
   useEffect(() => {
-    if (isQuotaExceeded()) return;
-    // Helper to get stats from cache
+    // Load cache for instant display
     const loadCache = async () => {
-      const cachedStats = Storage.getSmall<any>('dashboard_stats_cache');
-      if (cachedStats) {
-        setStats(cachedStats);
-      }
+      try {
+        const cachedStats = Storage.getSmall<any>('dashboard_stats_cache');
+        if (cachedStats) {
+          setStats(cachedStats);
+        }
 
-      // Load large data from IndexedDB for instant display/offline fallback
-      const cachedOrders = await Storage.getLarge<Order[]>('dashboard_orders_cache');
-      if (cachedOrders) {
-        setOrders(cachedOrders);
-        setRecentOrders(cachedOrders.slice(0, 5));
-      }
+        // Load large data from IndexedDB for instant display/offline fallback
+        const cachedOrders = await Storage.getLarge<Order[]>('dashboard_orders_cache');
+        const backupOrders = await Storage.getBackupOrders();
+        const bestOrders = (cachedOrders && cachedOrders.length > 0) ? cachedOrders : backupOrders;
+        
+        if (bestOrders.length > 0) {
+          setOrders(bestOrders);
+          setRecentOrders(bestOrders.slice(0, 5));
+        }
 
-      const cachedProducts = await Storage.getLarge<Product[]>('dashboard_products_cache');
-      if (cachedProducts) {
-        setProductsList(cachedProducts);
+        const cachedProducts = await Storage.getLarge<Product[]>('dashboard_products_cache');
+        const backupProducts = await Storage.getBackupProducts();
+        const bestProducts = (cachedProducts && cachedProducts.length > 0) ? cachedProducts : backupProducts;
+        
+        if (bestProducts.length > 0) {
+          setProductsList(bestProducts);
+        }
+      } catch (err) {
+        console.warn("Dashboard cache load error:", err);
       }
     };
     
     loadCache();
+
+    if (isQuotaExceeded()) {
+      setLoading(false);
+      return;
+    }
 
     // Listen to orders for revenue, total count, and recent list
     // Use a limit to avoid fetching thousands of documents if they exist
