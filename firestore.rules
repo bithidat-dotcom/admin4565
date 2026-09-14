@@ -20,6 +20,14 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    match /cafe_products/{productId} {
+      allow read, write: if true;
+    }
+
+    match /cafe_orders/{orderId} {
+      allow read, write: if true;
+    }
+
     match /banners/{bannerId} {
       allow read, write: if true;
     }

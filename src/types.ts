@@ -109,4 +109,30 @@ export interface Seller {
   rating?: number;
 }
 
-export type View = 'dashboard' | 'products' | 'orders' | 'banners' | 'reviews' | 'users' | 'sellers' | 'settings' | 'employees';
+export interface CafeProduct {
+  id: string;
+  name: string;
+  price: number;
+  category: 'Drinks' | 'Food' | 'Snacks' | 'Desserts';
+  image: string;
+  description: string;
+  created_at: string;
+  stock?: number;
+}
+
+export interface CafeOrder {
+  id: string;
+  customer_name: string;
+  whatsapp_number: string;
+  location: string;
+  price: number;
+  product_name: string;
+  product_image?: string;
+  quantity: number;
+  status: 'pending' | 'preparing' | 'completed' | 'cancelled';
+  created_at: string;
+  delivery_charge?: number;
+  shop_name?: string;
+}
+
+export type View = 'dashboard' | 'products' | 'orders' | 'banners' | 'reviews' | 'users' | 'sellers' | 'settings' | 'employees' | 'cafe-management';

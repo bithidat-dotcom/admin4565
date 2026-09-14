@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, ShoppingBag, ShoppingCart, Image as ImageIcon, ChevronRight, Star, Users, X, Link as LinkIcon, Store, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, ShoppingCart, Image as ImageIcon, ChevronRight, Star, Users, X, Link as LinkIcon, Store, Settings, LogOut, Coffee } from 'lucide-react';
 import { View } from '../types';
 import { cn } from '../lib/utils';
 import { UserSession } from '../App';
@@ -20,6 +20,7 @@ export default function Sidebar({ currentView, onViewChange, isOpen = false, onC
     { id: 'dashboard' as View, icon: LayoutDashboard, label: 'Dashboard', adminOnly: false },
     { id: 'products' as View, icon: ShoppingBag, label: 'Products', adminOnly: false },
     { id: 'orders' as View, icon: ShoppingCart, label: 'Orders', adminOnly: false },
+    { id: 'cafe-management' as View, icon: Coffee, label: 'Drink Cafe', adminOnly: false, isCafe: true },
     { id: 'banners' as View, icon: ImageIcon, label: 'Banners', adminOnly: true },
     { id: 'reviews' as View, icon: Star, label: 'Reviews', adminOnly: true },
     { id: 'sellers' as View, icon: Store, label: 'Sellers', adminOnly: false },
@@ -75,15 +76,18 @@ export default function Sidebar({ currentView, onViewChange, isOpen = false, onC
             className={cn(
               "w-full flex items-center justify-start gap-4 p-4 rounded-2xl transition-all duration-300 group cursor-pointer relative",
               currentView === item.id
-                ? "bg-brand text-white shadow-lg shadow-brand/20"
-                : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                ? (item.id === 'cafe-management' ? "bg-[#e8f5e9] text-[#2e7d32] shadow-md shadow-[#2e7d32]/10 border border-[#2e7d32]/30" : "bg-brand text-white shadow-lg shadow-brand/20")
+                : (item.id === 'cafe-management' ? "text-[#2e7d32] bg-[#e8f5e9]/30 hover:bg-[#e8f5e9]/70 hover:text-[#2e7d32]" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900")
             )}
           >
             <item.icon className={cn(
               "w-6 h-6",
-              currentView === item.id ? "text-white" : "text-slate-400 group-hover:text-slate-600"
+              currentView === item.id ? (item.id === 'cafe-management' ? "text-[#2e7d32]" : "text-white") : (item.id === 'cafe-management' ? "text-[#2e7d32]" : "text-slate-400 group-hover:text-slate-600")
             )} />
             <span className="text-sm font-black uppercase tracking-tight">{item.label}</span>
+            {item.id === 'cafe-management' && (
+              <span className="text-[9px] font-black bg-[#2e7d32] text-white px-2 py-0.5 rounded-full uppercase tracking-widest ml-auto">Cafe</span>
+            )}
             {item.id === 'orders' && !isSeller && (
               <span className={cn(
                 "absolute top-3 right-3 w-2.5 h-2.5 rounded-full",

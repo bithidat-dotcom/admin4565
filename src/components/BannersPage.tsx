@@ -95,7 +95,15 @@ export default function BannersPage() {
               >
                 <div className="aspect-[21/9] bg-slate-50 overflow-hidden flex items-center justify-center relative">
                   {banner.image ? (
-                    <img src={banner.image} alt={banner.title} referrerPolicy="no-referrer" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000" />
+                    <img 
+                      src={banner.image} 
+                      alt={banner.title} 
+                      referrerPolicy="no-referrer" 
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000" 
+                      onError={(e) => {
+                        e.currentTarget.src = 'https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&q=80&w=1000';
+                      }}
+                    />
                   ) : (
                     <ImageIcon className="w-12 h-12 text-slate-200" />
                   )}

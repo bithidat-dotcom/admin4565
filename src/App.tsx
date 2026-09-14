@@ -8,6 +8,7 @@ import ReviewsPage from './components/ReviewsPage';
 import UsersPage from './components/UsersPage';
 import SellersPage from './components/SellersPage';
 import SettingsPage from './components/SettingsPage';
+import CafeManagementPage from './components/CafeManagementPage';
 import LoginPage from './components/LoginPage';
 import LinkConverterModal from './components/LinkConverterModal';
 import PopupAd from './components/PopupAd';
@@ -277,6 +278,8 @@ export default function App() {
         return <SellersPage userSession={userSession} />;
       case 'settings':
         return <SettingsPage />;
+      case 'cafe-management':
+        return <CafeManagementPage />;
       default:
         return <Dashboard onViewChange={setCurrentView} />;
     }
