@@ -9,7 +9,7 @@ import imageCompression from 'browser-image-compression';
 interface ImageUploaderProps {
   value: string;
   onChange: (url: string) => void;
-  folder: 'products' | 'banners' | 'sellers';
+  folder: 'products' | 'banners' | 'sellers' | 'foods';
   className?: string;
 }
 

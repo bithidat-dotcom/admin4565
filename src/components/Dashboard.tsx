@@ -24,7 +24,12 @@ import {
   Trophy, 
   ShoppingBasket,
   PenTool,
-  Check
+  Check,
+  Server,
+  Wifi,
+  WifiOff,
+  Database,
+  RefreshCw
 } from 'lucide-react';
 import { formatCurrency, cn } from '../lib/utils';
 import { Storage } from '../lib/storage';
@@ -76,6 +81,58 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
   const [boardNote, setBoardNote] = useState(() => Storage.getSmall('dashboard_define_note') || 'Welcome to the pbazar admin hub! Set daily target numbers, notice highlights, or custom operational parameters here.');
   const [isNoteEditing, setIsNoteEditing] = useState(false);
 
+  // Multi-Server Gateway Connection States
+  const [serverHost, setServerHost] = useState(() => localStorage.getItem('pbazar_custom_server_host') || window.location.origin);
+  const [s1Status, setS1Status] = useState<'testing' | 'online' | 'offline'>('testing');
+  const [s2Status, setS2Status] = useState<'testing' | 'online' | 'offline'>('testing');
+  const [s1Latency, setS1Latency] = useState<number | null>(null);
+  const [s2Latency, setS2Latency] = useState<number | null>(null);
+  const [isServerConnecting, setIsServerConnecting] = useState(false);
+  const [connectionMessage, setConnectionMessage] = useState<string | null>(null);
+
+  const testServerConnections = async (host = serverHost) => {
+    setIsServerConnecting(true);
+    setConnectionMessage('Handshaking with API Gateways...');
+    setS1Status('testing');
+    setS2Status('testing');
+
+    const cleanHost = host.trim().replace(/\/$/, "");
+
+    // Test Server 1 (Products Gateway)
+    const t0 = performance.now();
+    try {
+      const res = await fetch(`${cleanHost}/api/products`);
+      if (res.ok) {
+        setS1Latency(Math.round(performance.now() - t0));
+        setS1Status('online');
+      } else {
+        setS1Status('offline');
+      }
+    } catch {
+      setS1Status('offline');
+    }
+
+    // Test Server 2 (Food Gateway)
+    const t1 = performance.now();
+    try {
+      const res = await fetch(`${cleanHost}/api/foods`);
+      if (res.ok) {
+        setS2Latency(Math.round(performance.now() - t1));
+        setS2Status('online');
+      } else {
+        setS2Status('offline');
+      }
+    } catch {
+      setS2Status('offline');
+    }
+
+    setIsServerConnecting(false);
+    setConnectionMessage('Both service gateways resolved successfully.');
+  };
+
+  useEffect(() => {
+    testServerConnections();
+  }, []);
 
   useEffect(() => {
     setMounted(true);
@@ -244,7 +301,7 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
   const statCards = [
     { label: 'TOTAL SALES COUNT', value: stats.totalOrders.toString(), icon: ShoppingCart, color: 'text-brand', bg: 'bg-brand-light border border-brand/20', change: 'Total Orders Tracked', changeColor: 'text-brand' },
     { label: 'PAST EARN (REALIZED)', value: formatCurrency(pastEarn), icon: TrendingUp, color: 'text-emerald-500', bg: 'bg-emerald-50/70 border border-emerald-100', change: 'Delivered or Completed', changeColor: 'text-emerald-500' },
-    { label: 'FUTURE EARN (PENDING)', value: formatCurrency(futureEarn), icon: TrendingUp, color: 'text-amber-500', bg: 'bg-amber-50/70 border border-amber-100', change: 'Awaiting Fulfillment', changeColor: 'text-amber-500' },
+    { label: 'FUTURE EARN (PENDING)', value: formatCurrency(futureEarn), icon: TrendingUp, color: 'text-blue-500', bg: 'bg-blue-50/70 border border-blue-100', change: 'Awaiting Fulfillment', changeColor: 'text-blue-500' },
     { label: 'DELIVERY REVENUE', value: formatCurrency(stats.totalRevenue), icon: TrendingUp, color: 'text-indigo-500', bg: 'bg-indigo-50/75 border border-indigo-100', change: 'Active & complete', changeColor: 'text-indigo-550' },
     { label: 'PRODUCTS TOTAL', value: stats.totalProducts.toString(), icon: ShoppingBag, color: 'text-slate-700', bg: 'bg-slate-50 border border-slate-200/60', change: `${totalStock} in stock • ${totalSold} sold`, changeColor: 'text-slate-500' },
     !isSeller && { label: 'SELLERS BASE', value: stats.totalSellers.toString(), icon: Users, color: 'text-purple-500', bg: 'bg-purple-50 border border-purple-100', change: `${stats.totalUsers} customers`, changeColor: 'text-purple-550' },
@@ -263,7 +320,7 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
     value 
   }));
 
-  const COLORS = ['#6366f1', '#f59e0b', '#10b981', '#ef4444', '#64748b', '#0f172a'];
+  const COLORS = ['#6366f1', '#3b82f6', '#10b981', '#ef4444', '#64748b', '#0f172a'];
 
   // Last 7 days order frequency
   const last7Days = Array.from({ length: 7 }, (_, i) => subDays(new Date(), i)).reverse();
@@ -667,7 +724,7 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
                               "px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border shrink-0 inline-block",
                               order.status === 'delivered' ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
                               order.status === 'completed' ? "bg-brand text-white border-brand" :
-                              order.status === 'pending' ? "bg-amber-50 text-amber-600 border-amber-100" :
+                              order.status === 'pending' ? "bg-blue-50 text-blue-600 border-blue-100" :
                               order.status === 'cancelled' ? "bg-red-50 text-red-600 border-red-100" :
                               "bg-indigo-50 text-indigo-600 border-indigo-100"
                             )}>

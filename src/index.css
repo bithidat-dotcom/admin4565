@@ -5,9 +5,9 @@
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   
-  --color-brand: #f97316;
-  --color-brand-dark: #ea580c;
-  --color-brand-light: #fff7ed;
+  --color-brand: #1E5EF3;
+  --color-brand-dark: #0f4bc9;
+  --color-brand-light: #eff6ff;
 }
 
 /* Custom scrollbar for better UX */

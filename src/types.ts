@@ -135,4 +135,80 @@ export interface CafeOrder {
   shop_name?: string;
 }
 
-export type View = 'dashboard' | 'products' | 'orders' | 'banners' | 'reviews' | 'users' | 'sellers' | 'settings' | 'employees' | 'cafe-management';
+export type View = 'dashboard' | 'products' | 'orders' | 'banners' | 'reviews' | 'users' | 'sellers' | 'settings' | 'employees' | 'cafe-management' | 'food' | 'food-orders' | 'inventory' | 'offers' | 'analytics' | 'customers' | 'notifications';
+
+export interface FoodItem {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  ingredients?: string;
+  image: string;
+  additional_images?: string[];
+  price: number; // Small or default price
+  discount?: number;
+  final_price: number;
+  sizes?: {
+    small: number;
+    medium: number;
+    large: number;
+  };
+  stock: number;
+  preparation_time?: string;
+  calories?: string;
+  spicy_level?: 'none' | 'mild' | 'medium' | 'hot' | 'extra_hot';
+  is_available: boolean;
+  is_featured?: boolean;
+  is_popular?: boolean;
+  rating?: number;
+  sold_quantity?: number;
+  created_at: string;
+}
+
+export interface FoodOrder {
+  id: string;
+  customer_name: string;
+  whatsapp_number: string;
+  location: string;
+  food_items: {
+    id: string;
+    name: string;
+    quantity: number;
+    size: 'small' | 'medium' | 'large' | 'default';
+    price: number;
+  }[];
+  price: number; // Final subtotal
+  delivery_charge: number;
+  discount: number;
+  total: number;
+  payment_method: 'cash' | 'card' | 'mobile_banking';
+  payment_status: 'pending' | 'paid';
+  status: 'pending' | 'accepted' | 'preparing' | 'ready' | 'picked_up' | 'on_the_way' | 'delivered' | 'completed' | 'cancelled';
+  created_at: string;
+}
+
+export interface InventoryItem {
+  id: string;
+  item_name: string;
+  type: 'product' | 'food';
+  stock: number;
+  minimum_stock: number;
+  sold: number;
+  last_updated: string;
+}
+
+export interface PromoOffer {
+  id: string;
+  name: string;
+  type: 'percentage' | 'fixed' | 'food' | 'product' | 'combo' | 'flash_sale';
+  code?: string;
+  description: string;
+  discount: number;
+  banner?: string;
+  start_date: string;
+  end_date: string;
+  min_order?: number;
+  max_discount?: number;
+  is_active: boolean;
+  created_at: string;
+}

@@ -9,6 +9,13 @@ import UsersPage from './components/UsersPage';
 import SellersPage from './components/SellersPage';
 import SettingsPage from './components/SettingsPage';
 import CafeManagementPage from './components/CafeManagementPage';
+import AnalyticsPage from './components/AnalyticsPage';
+import FoodPage from './components/FoodPage';
+import FoodOrdersPage from './components/FoodOrdersPage';
+import InventoryPage from './components/InventoryPage';
+import OffersPage from './components/OffersPage';
+import CustomersPage from './components/CustomersPage';
+import NotificationsPage from './components/NotificationsPage';
 import LoginPage from './components/LoginPage';
 import LinkConverterModal from './components/LinkConverterModal';
 import PopupAd from './components/PopupAd';
@@ -280,6 +287,20 @@ export default function App() {
         return <SettingsPage />;
       case 'cafe-management':
         return <CafeManagementPage />;
+      case 'analytics':
+        return <AnalyticsPage />;
+      case 'food':
+        return <FoodPage />;
+      case 'food-orders':
+        return <FoodOrdersPage />;
+      case 'inventory':
+        return <InventoryPage />;
+      case 'offers':
+        return <OffersPage />;
+      case 'customers':
+        return <CustomersPage />;
+      case 'notifications':
+        return <NotificationsPage />;
       default:
         return <Dashboard onViewChange={setCurrentView} />;
     }

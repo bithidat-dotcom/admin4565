@@ -385,7 +385,19 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
     const id = productToDelete;
     setDeletingId(id);
     try {
-      await deleteDoc(doc(db, 'products', id));
+      let success = false;
+      try {
+        const response = await fetch(`/api/products/${id}`, { method: 'DELETE' });
+        if (response.ok) {
+          success = true;
+        }
+      } catch (err) {
+        console.warn("Express server product deletion failed, falling back to direct client SDK", err);
+      }
+
+      if (!success) {
+        await deleteDoc(doc(db, 'products', id));
+      }
       setProductToDelete(null);
     } catch (err) {
       console.error("Delete failed:", err);
@@ -537,13 +549,31 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
     }
 
     try {
-      if (editingProduct) {
-        await updateDoc(doc(db, 'products', editingProduct.id), payload);
-      } else {
-        await addDoc(collection(db, 'products'), {
-          ...payload,
-          created_at: serverTimestamp()
+      let success = false;
+      try {
+        const url = editingProduct ? `/api/products/${editingProduct.id}` : `/api/products`;
+        const method = editingProduct ? 'PUT' : 'POST';
+        const response = await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
         });
+        if (response.ok) {
+          success = true;
+        }
+      } catch (err) {
+        console.warn("Express server product API failed, falling back to direct Firestore client SDK", err);
+      }
+
+      if (!success) {
+        if (editingProduct) {
+          await updateDoc(doc(db, 'products', editingProduct.id), payload);
+        } else {
+          await addDoc(collection(db, 'products'), {
+            ...payload,
+            created_at: new Date().toISOString()
+          });
+        }
       }
       
       setIsModalOpen(false);
@@ -750,9 +780,24 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
                           onClick={async (e) => {
                             e.stopPropagation();
                             try {
-                              await updateDoc(doc(db, 'products', product.id), {
-                                is_super_sale: !product.is_super_sale
-                              });
+                              const updatedData = { is_super_sale: !product.is_super_sale };
+                              let success = false;
+                              try {
+                                const response = await fetch(`/api/products/${product.id}`, {
+                                  method: 'PUT',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify(updatedData)
+                                });
+                                if (response.ok) {
+                                  success = true;
+                                }
+                              } catch (err) {
+                                console.warn("Express API failed for toggle super sale, falling back", err);
+                              }
+
+                              if (!success) {
+                                await updateDoc(doc(db, 'products', product.id), updatedData);
+                              }
                             } catch (err) {
                               handleFirestoreError(err, OperationType.UPDATE, `products/${product.id}`);
                             }

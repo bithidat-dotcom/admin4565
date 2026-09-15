@@ -1,5 +1,9 @@
 import React from 'react';
-import { LayoutDashboard, ShoppingBag, ShoppingCart, Image as ImageIcon, ChevronRight, Star, Users, X, Link as LinkIcon, Store, Settings, LogOut, Coffee } from 'lucide-react';
+import { 
+  LayoutDashboard, ShoppingBag, ShoppingCart, Star, Users, X, 
+  Link as LinkIcon, Store, Settings, LogOut, Coffee, BarChart3, 
+  UtensilsCrossed, Warehouse, Tag, Bell, Menu, ShieldAlert 
+} from 'lucide-react';
 import { View } from '../types';
 import { cn } from '../lib/utils';
 import { UserSession } from '../App';
@@ -17,15 +21,18 @@ export default function Sidebar({ currentView, onViewChange, isOpen = false, onC
   const isSeller = userSession?.role === 'seller';
 
   const menuItems = [
-    { id: 'dashboard' as View, icon: LayoutDashboard, label: 'Dashboard', adminOnly: false },
-    { id: 'products' as View, icon: ShoppingBag, label: 'Products', adminOnly: false },
-    { id: 'orders' as View, icon: ShoppingCart, label: 'Orders', adminOnly: false },
-    { id: 'cafe-management' as View, icon: Coffee, label: 'Drink Cafe', adminOnly: false, isCafe: true },
-    { id: 'banners' as View, icon: ImageIcon, label: 'Banners', adminOnly: true },
-    { id: 'reviews' as View, icon: Star, label: 'Reviews', adminOnly: true },
-    { id: 'sellers' as View, icon: Store, label: 'Sellers', adminOnly: false },
-    { id: 'settings' as View, icon: Settings, label: 'Settings', adminOnly: true },
-  ].filter(item => !isSeller || !item.adminOnly);
+    { id: 'dashboard' as View, icon: LayoutDashboard, label: 'Dashboard', sellerAllowed: true },
+    { id: 'orders' as View, icon: ShoppingCart, label: 'Orders', sellerAllowed: true },
+    { id: 'analytics' as View, icon: BarChart3, label: 'Analytics', sellerAllowed: false },
+    { id: 'products' as View, icon: ShoppingBag, label: 'Products', sellerAllowed: true },
+    { id: 'food' as View, icon: UtensilsCrossed, label: 'Food Section', sellerAllowed: true },
+    { id: 'inventory' as View, icon: Warehouse, label: 'Inventory', sellerAllowed: true },
+    { id: 'offers' as View, icon: Tag, label: 'Offers', sellerAllowed: false },
+    { id: 'customers' as View, icon: Users, label: 'Customers', sellerAllowed: false },
+    { id: 'reviews' as View, icon: Star, label: 'Reviews', sellerAllowed: false },
+    { id: 'notifications' as View, icon: Bell, label: 'Notifications', sellerAllowed: true },
+    { id: 'settings' as View, icon: Settings, label: 'Settings', sellerAllowed: false },
+  ].filter(item => !isSeller || item.sellerAllowed);
 
   return (
     <>
@@ -38,117 +45,124 @@ export default function Sidebar({ currentView, onViewChange, isOpen = false, onC
       )}
 
       <aside className={cn(
-        "w-64 bg-white border-r border-slate-200 h-screen fixed top-0 flex flex-col z-50 transition-transform duration-300 ease-in-out md:translate-x-0 md:left-0",
+        "w-64 bg-[#1E5EF3] text-white h-screen fixed top-0 flex flex-col z-50 transition-transform duration-300 ease-in-out md:translate-x-0 md:left-0 shadow-2xl",
         isOpen ? "translate-x-0 left-0" : "-translate-x-full md:translate-x-0"
       )}>
-        <div className="p-8 pb-6 border-b border-slate-100 flex flex-col gap-4">
+        {/* Brand Header */}
+        <div className="p-6 pb-6 border-b border-white/10 flex flex-col gap-4">
           <div className="flex items-center justify-between">
-            <img src="https://i.postimg.cc/KvqR53hq/download-(1).png" alt="Logo" className="w-12 h-12 rounded-2xl object-contain bg-slate-50 p-1 border border-slate-100 shadow-sm" />
+            <div className="flex items-center gap-3">
+              <img 
+                src="https://i.postimg.cc/KvqR53hq/download-(1).png" 
+                alt="Logo" 
+                className="w-10 h-10 rounded-xl object-contain bg-white/10 p-1 border border-white/20 shadow-inner" 
+              />
+              <div>
+                <h1 className="text-xl font-black tracking-tighter leading-none flex items-center gap-0.5 text-white">
+                  pbazar
+                </h1>
+                <span className="text-[9px] font-bold text-white/60 tracking-wider uppercase">Partner Suite</span>
+              </div>
+            </div>
             
             <button
               onClick={onClose}
-              className="md:hidden p-2 text-slate-400 hover:text-slate-900 hover:bg-slate-50 rounded-xl transition-all border border-slate-100"
+              className="md:hidden p-1.5 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-all"
               title="Close Drawer"
             >
-              <X className="w-4 h-4" />
+              <X className="w-5 h-5" />
             </button>
           </div>
-
-          <div>
-            <h1 className="text-2xl font-black text-slate-900 tracking-tighter flex items-center gap-1 leading-none">
-              p<span className="text-brand">bazar</span>
-            </h1>
-            <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-2 pr-1">
-              PartNet v3.0 • {userSession?.role?.toUpperCase()}
-            </div>
-          </div>
         </div>
 
-      <nav className="flex-1 p-4 space-y-4 mt-6 overflow-y-auto">
-        {menuItems.map((item) => (
+        {/* Navigation Section */}
+        <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10">
+          {menuItems.map((item) => {
+            const isActive = currentView === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => {
+                  onViewChange(item.id);
+                  onClose();
+                }}
+                title={item.label}
+                className={cn(
+                  "w-full flex items-center justify-start gap-3.5 px-4 py-3 rounded-xl transition-all duration-300 group cursor-pointer relative font-semibold text-xs tracking-wide uppercase",
+                  isActive
+                    ? "bg-white text-[#1E5EF3] shadow-lg shadow-black/10 font-bold scale-[1.02]"
+                    : "text-white/80 hover:bg-white/10 hover:text-white"
+                )}
+              >
+                <item.icon className={cn(
+                  "w-4.5 h-4.5 transition-transform duration-300 group-hover:scale-110",
+                  isActive ? "text-[#1E5EF3]" : "text-white/70 group-hover:text-white"
+                )} />
+                <span>{item.label}</span>
+                {item.id === 'food' && (
+                  <span className="text-[8px] font-black bg-emerald-400 text-slate-950 px-2 py-0.5 rounded-full uppercase tracking-widest ml-auto shrink-0">New</span>
+                )}
+                {item.id === 'orders' && !isSeller && (
+                  <span className={cn(
+                    "absolute top-1/2 -translate-y-1/2 right-4 w-2 h-2 rounded-full",
+                    isActive ? "bg-[#1E5EF3]" : "bg-red-400 animate-pulse"
+                  )} />
+                )}
+              </button>
+            );
+          })}
+
+          <div className="pt-4 pb-1 px-4 text-[9px] font-black text-white/50 uppercase tracking-[0.2em]">
+            Quick Actions
+          </div>
           <button
-            key={item.id}
+            type="button"
             onClick={() => {
-              onViewChange(item.id);
+              try {
+                window.dispatchEvent(new CustomEvent('open-link-converter'));
+              } catch (e) {
+                const event = document.createEvent('CustomEvent');
+                event.initCustomEvent('open-link-converter', true, true, {});
+                window.dispatchEvent(event);
+              }
               onClose();
             }}
-            title={item.label}
-            className={cn(
-              "w-full flex items-center justify-start gap-4 p-4 rounded-2xl transition-all duration-300 group cursor-pointer relative",
-              currentView === item.id
-                ? (item.id === 'cafe-management' ? "bg-[#e8f5e9] text-[#2e7d32] shadow-md shadow-[#2e7d32]/10 border border-[#2e7d32]/30" : "bg-brand text-white shadow-lg shadow-brand/20")
-                : (item.id === 'cafe-management' ? "text-[#2e7d32] bg-[#e8f5e9]/30 hover:bg-[#e8f5e9]/70 hover:text-[#2e7d32]" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900")
-            )}
+            className="w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-xs font-semibold uppercase tracking-wide text-white/70 hover:bg-white/10 hover:text-white transition-all cursor-pointer"
           >
-            <item.icon className={cn(
-              "w-6 h-6",
-              currentView === item.id ? (item.id === 'cafe-management' ? "text-[#2e7d32]" : "text-white") : (item.id === 'cafe-management' ? "text-[#2e7d32]" : "text-slate-400 group-hover:text-slate-600")
-            )} />
-            <span className="text-sm font-black uppercase tracking-tight">{item.label}</span>
-            {item.id === 'cafe-management' && (
-              <span className="text-[9px] font-black bg-[#2e7d32] text-white px-2 py-0.5 rounded-full uppercase tracking-widest ml-auto">Cafe</span>
-            )}
-            {item.id === 'orders' && !isSeller && (
-              <span className={cn(
-                "absolute top-3 right-3 w-2.5 h-2.5 rounded-full",
-                currentView === item.id ? "bg-white" : "bg-red-500"
-              )} />
-            )}
+            <LinkIcon className="w-4.5 h-4.5 text-white/60 animate-pulse" />
+            <span>Link Converter</span>
           </button>
-        ))}
+        </nav>
 
-        <div className="px-4 pt-4 mb-2 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
-          Utilities
-        </div>
-        <button
-          type="button"
-          onClick={() => {
-            try {
-              window.dispatchEvent(new CustomEvent('open-link-converter'));
-            } catch (e) {
-              const event = document.createEvent('CustomEvent');
-              event.initCustomEvent('open-link-converter', true, true, {});
-              window.dispatchEvent(event);
-            }
-            onClose();
-          }}
-          className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-black uppercase tracking-widest text-slate-500 hover:bg-slate-50 hover:text-indigo-600 transition-all duration-300 group cursor-pointer"
-        >
-          <div className="flex items-center gap-3">
-            <LinkIcon className="w-4 h-4 text-slate-400 group-hover:text-brand animate-pulse" />
-            Link Converter
-          </div>
-        </button>
-
-        <button
-          type="button"
-          onClick={onLogout}
-          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-black uppercase tracking-widest text-rose-500 hover:bg-rose-50 transition-all duration-300 group cursor-pointer mt-4"
-        >
-          <LogOut className="w-4 h-4" />
-          Logout System
-        </button>
-      </nav>
-
-      <div className="p-6 border-t border-slate-100 bg-slate-50/50">
-        <div className="flex items-center gap-3 p-3 bg-white rounded-2xl border border-slate-200/60 shadow-sm">
-          <div className="w-9 h-9 rounded-xl bg-brand flex items-center justify-center text-white font-black text-xs">
-            {userSession?.role === 'admin' ? 'BA' : userSession?.name?.slice(0, 2).toUpperCase()}
-          </div>
-          <div className="flex flex-col overflow-hidden">
-            <span className="text-[11px] font-black text-slate-900 uppercase truncate">
-              {userSession?.role === 'admin' ? 'pbazar Admin' : userSession?.name}
-            </span>
-            <div className="flex items-center gap-1.5">
-               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-               <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest leading-none">
-                 {userSession?.role === 'admin' ? 'Root Access' : `ID: ${userSession?.sellerId}`}
-               </span>
+        {/* Footer Admin Profile */}
+        <div className="p-4 border-t border-white/10 bg-black/10">
+          <div className="flex items-center gap-3 p-2 bg-white/5 rounded-xl border border-white/10">
+            <div className="w-9 h-9 rounded-lg bg-emerald-400 flex items-center justify-center text-slate-950 font-black text-xs shrink-0 shadow-inner">
+              {userSession?.role === 'admin' ? 'AD' : userSession?.name?.slice(0, 2).toUpperCase()}
+            </div>
+            <div className="flex flex-col overflow-hidden text-left">
+              <span className="text-[10px] font-black text-white uppercase truncate">
+                {userSession?.role === 'admin' ? 'pbazar Admin' : userSession?.name}
+              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="text-[8px] text-white/60 font-bold uppercase tracking-wider leading-none">
+                  {userSession?.role === 'admin' ? 'Root Access' : `ID: ${userSession?.sellerId}`}
+                </span>
+              </div>
             </div>
           </div>
+          
+          <button
+            type="button"
+            onClick={onLogout}
+            className="w-full flex items-center gap-2 px-3 py-2.5 mt-2 rounded-xl text-[10px] font-black uppercase tracking-widest text-red-300 hover:bg-red-500/20 hover:text-white transition-all duration-300 cursor-pointer"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span>Logout System</span>
+          </button>
         </div>
-      </div>
-    </aside>
-  </>
-);
+      </aside>
+    </>
+  );
 }
