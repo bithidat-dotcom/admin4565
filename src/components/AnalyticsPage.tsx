@@ -4,7 +4,7 @@ import {
   AreaChart, Area, PieChart, Pie, Cell 
 } from 'recharts';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, onSnapshot, query } from 'firebase/firestore';
+import { collection, onSnapshot, query, limit } from 'firebase/firestore';
 import { 
   BarChart3, TrendingUp, DollarSign, ShoppingBag, 
   Users, Calendar, Clock, ArrowUpRight 
@@ -23,7 +23,7 @@ export default function AnalyticsPage() {
 
   useEffect(() => {
     // 1. Subscribe to orders
-    const qOrders = query(collection(db, 'orders'));
+    const qOrders = query(collection(db, 'orders'), limit(500));
     const unsubscribeOrders = onSnapshot(qOrders, (snapshot) => {
       const allOrders = snapshot.docs.map(doc => {
         const data = doc.data();
@@ -44,7 +44,7 @@ export default function AnalyticsPage() {
     });
 
     // 2. Subscribe to products for top sellers
-    const qProducts = query(collection(db, 'products'));
+    const qProducts = query(collection(db, 'products'), limit(500));
     const unsubscribeProducts = onSnapshot(qProducts, (snapshot) => {
       const pList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[];
       setProducts(pList);

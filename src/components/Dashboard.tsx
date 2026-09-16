@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db, handleFirestoreError, OperationType, isQuotaExceeded } from '../lib/firebase';
-import { collection, onSnapshot, query, orderBy, limit, getDocs, where, or } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, limit, getDocs, getCountFromServer, where, or } from 'firebase/firestore';
 import Header from '../components/Header';
 import LoadingDots from './LoadingDots';
 import { 
@@ -233,43 +233,28 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'orders'));
 
     // For products, banners, reviews, users, sellers:
-    // We only need counts on the dashboard. Let's do one-time fetches with 1 document limit just to get size info if possible?
-    // Actually Firestores snapshot.size doesn't care about limit for total count of the query.
-    
-    const productCol = collection(db, 'products');
-    const qProducts = (isSeller && !isShowingGlobal) 
-      ? query(productCol, or(where('seller_id', '==', currentSellerId), where('seller', '==', currentSellerName)), limit(50)) 
-      : query(productCol, limit(50));
-
-    const unsubscribeProducts = onSnapshot(qProducts, (snapshot) => {
-      const pList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[];
-      setProductsList(pList);
-      Storage.setLarge('dashboard_products_cache', pList);
-      setStats(prev => {
-        const updated = { ...prev, totalProducts: snapshot.size };
-        Storage.setSmall('dashboard_stats_cache', updated);
-        return updated;
-      });
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'products'));
-
     // These don't need real-time updates for dashboard totals. One-time is enough to save quota.
     const fetchCounts = async () => {
       if (isSeller && !isShowingGlobal) return; // Only fetch global counts if requested or admin
       try {
-        const [bannersSnap, reviewsSnap, usersSnap, sellersSnap] = await Promise.all([
-          getDocs(collection(db, 'banners')),
-          getDocs(collection(db, 'reviews')),
-          getDocs(collection(db, 'users')),
-          getDocs(collection(db, 'sellers'))
+        const [bannersSnap, reviewsSnap, usersSnap, sellersSnap, productsSnap, ordersSnap] = await Promise.all([
+          getCountFromServer(collection(db, 'banners')),
+          getCountFromServer(collection(db, 'reviews')),
+          getCountFromServer(collection(db, 'users')),
+          getCountFromServer(collection(db, 'sellers')),
+          getCountFromServer(collection(db, 'products')),
+          getCountFromServer(collection(db, 'orders'))
         ]);
         
         setStats(prev => {
           const updated = {
             ...prev,
-            totalBanners: bannersSnap.size,
-            totalReviews: reviewsSnap.size,
-            totalUsers: usersSnap.size,
-            totalSellers: sellersSnap.size
+            totalBanners: bannersSnap.data().count,
+            totalReviews: reviewsSnap.data().count,
+            totalUsers: usersSnap.data().count,
+            totalSellers: sellersSnap.data().count,
+            totalProducts: productsSnap.data().count,
+            totalOrders: ordersSnap.data().count,
           };
           Storage.setSmall('dashboard_stats_cache', updated);
           return updated;
@@ -279,6 +264,17 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
       }
     };
     fetchCounts();
+
+    const productCol = collection(db, 'products');
+    const qProducts = (isSeller && !isShowingGlobal) 
+      ? query(productCol, or(where('seller_id', '==', currentSellerId), where('seller', '==', currentSellerName)), limit(50)) 
+      : query(productCol, limit(50));
+
+    const unsubscribeProducts = onSnapshot(qProducts, (snapshot) => {
+      const pList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[];
+      setProductsList(pList);
+      Storage.setLarge('dashboard_products_cache', pList);
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'products'));
 
     return () => {
       unsubscribeOrders();

@@ -77,9 +77,17 @@ export default function BannersPage() {
 
   return (
     <div className="flex-1 overflow-x-hidden">
-      <Header title="Banners" onAction={() => setIsModalOpen(true)} actionLabel="New Banner" />
+      <div className="flex items-center justify-between p-6 border-b border-slate-100">
+        <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Active Store Banners</h3>
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="bg-[#1E5EF3] hover:bg-[#1546be] text-white px-5 py-3 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 transition-all shadow-lg shadow-blue-600/10"
+        >
+          <ImageIcon className="w-4 h-4" /> New Banner
+        </button>
+      </div>
 
-      <main className="p-4 md:p-8 w-full">
+      <main className="p-6 md:p-8 w-full">
         {loading ? (
           <div className="flex items-center justify-center h-64">
             <LoadingDots />
@@ -184,7 +192,32 @@ export default function BannersPage() {
                   +
                 </div>
                 <p className="text-sm font-black text-slate-900 uppercase tracking-widest mb-1">No Active Banners</p>
-                <p className="text-xs font-bold text-slate-400">Your storefront promotional area is currently empty.</p>
+                <p className="text-xs font-bold text-slate-400 mb-6">Your storefront promotional area is currently empty.</p>
+                <button
+                  onClick={async () => {
+                    setSubmitting(true);
+                    try {
+                      await addDoc(collection(db, 'banners'), {
+                        title: 'Eid Mega Sale',
+                        image: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&q=80&w=1000',
+                        created_at: serverTimestamp()
+                      });
+                      await addDoc(collection(db, 'banners'), {
+                        title: 'Summer Refreshers',
+                        image: 'https://images.unsplash.com/photo-1543514251-d41a8fa4ec47?auto=format&fit=crop&q=80&w=1000',
+                        created_at: serverTimestamp()
+                      });
+                    } catch (e) {
+                      console.error(e);
+                    } finally {
+                      setSubmitting(false);
+                    }
+                  }}
+                  disabled={submitting}
+                  className="px-5 py-2.5 bg-blue-50 text-[#1E5EF3] border border-blue-100 hover:bg-[#1E5EF3] hover:text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all"
+                >
+                  Seed 2 Demo Banners
+                </button>
               </div>
             )}
           </div>

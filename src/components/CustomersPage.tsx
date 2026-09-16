@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db, handleFirestoreError, OperationType, isQuotaExceeded } from '../lib/firebase';
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
 import { User } from '../types';
 import LoadingDots from './LoadingDots';
 import { Users, Search, Phone, Mail, MapPin, Wallet, ShoppingBag } from 'lucide-react';
@@ -14,7 +14,7 @@ export default function CustomersPage() {
   useEffect(() => {
     if (isQuotaExceeded()) return;
 
-    const q = query(collection(db, 'users'), orderBy('created_at', 'desc'));
+    const q = query(collection(db, 'users'), orderBy('created_at', 'desc'), limit(100));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({
         id: doc.id,

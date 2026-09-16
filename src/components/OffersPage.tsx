@@ -4,13 +4,15 @@ import { collection, onSnapshot, query, orderBy, addDoc, deleteDoc, doc, updateD
 import { PromoOffer } from '../types';
 import LoadingDots from './LoadingDots';
 import { 
-  Tag, Percent, Plus, Trash2, Gift, Sparkles, Clock, 
-  Calendar, Check, AlertCircle, ToggleLeft, ToggleRight, Loader2 
+  Tag, Percent, Plus, Trash2, Gift, Clock,
+  ToggleLeft, ToggleRight, Loader2, Image as ImageIcon
 } from 'lucide-react';
-import { formatCurrency, cn } from '../lib/utils';
+import { cn } from '../lib/utils';
 import Modal from './Modal';
+import BannersPage from './BannersPage';
 
 export default function OffersPage() {
+  const [activeTab, setActiveTab] = useState<'coupons' | 'banners'>('coupons');
   const [offers, setOffers] = useState<PromoOffer[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -148,111 +150,153 @@ export default function OffersPage() {
         <div>
           <h2 className="text-xl font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
             <Tag className="w-5.5 h-5.5 text-[#1E5EF3]" />
-            Promotions & Offers Center
+            Promotions & Banners
           </h2>
-          <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1">Configure active checkout codes, flash sale percentage cuts, and date limitations</p>
+          <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1">Configure active checkout codes and visual store banners</p>
         </div>
 
-        <div className="flex items-center gap-3">
-          {offers.length === 0 && (
-            <button
-              onClick={handleSeedDemoOffers}
-              disabled={submitting}
-              className="px-5 py-2.5 bg-blue-50 text-[#1E5EF3] border border-blue-100 hover:bg-[#1E5EF3] hover:text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all"
-            >
-              Seed Demo Offers
-            </button>
-          )}
+        <div className="flex items-center gap-2 bg-slate-200/50 p-1 rounded-xl">
           <button
-            onClick={() => setIsModalOpen(true)}
-            className="bg-[#1E5EF3] hover:bg-[#1546be] text-white px-5 py-3 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 transition-all shadow-lg shadow-blue-600/10"
+            onClick={() => setActiveTab('coupons')}
+            className={cn(
+              "px-6 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all",
+              activeTab === 'coupons' 
+                ? "bg-white text-[#1E5EF3] shadow-sm" 
+                : "text-slate-500 hover:text-slate-700"
+            )}
           >
-            <Plus className="w-4 h-4" /> Create Coupon
+            <div className="flex items-center gap-2">
+              <Gift className="w-3.5 h-3.5" />
+              Coupons
+            </div>
+          </button>
+          <button
+            onClick={() => setActiveTab('banners')}
+            className={cn(
+              "px-6 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all",
+              activeTab === 'banners' 
+                ? "bg-white text-[#1E5EF3] shadow-sm" 
+                : "text-slate-500 hover:text-slate-700"
+            )}
+          >
+            <div className="flex items-center gap-2">
+              <ImageIcon className="w-3.5 h-3.5" />
+              Store Banners
+            </div>
           </button>
         </div>
       </div>
 
-      {loading ? (
-        <div className="flex justify-center py-24"><LoadingDots /></div>
+      {activeTab === 'banners' ? (
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+           <BannersPage />
+        </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {offers.map(offer => {
-            const hasExpired = new Date(offer.end_date) < new Date();
-            return (
-              <div 
-                key={offer.id}
-                className={cn(
-                  "bg-white rounded-2xl border border-slate-200/60 overflow-hidden shadow-sm flex flex-col justify-between p-6 space-y-4",
-                  !offer.is_active || hasExpired ? "opacity-65" : "hover:shadow-md transition-all"
-                )}
+        <>
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Active Discount Codes</h3>
+            <div className="flex items-center gap-3">
+              {offers.length === 0 && (
+                <button
+                  onClick={handleSeedDemoOffers}
+                  disabled={submitting}
+                  className="px-5 py-2.5 bg-blue-50 text-[#1E5EF3] border border-blue-100 hover:bg-[#1E5EF3] hover:text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all"
+                >
+                  Seed Demo
+                </button>
+              )}
+              <button
+                onClick={() => setIsModalOpen(true)}
+                className="bg-[#1E5EF3] hover:bg-[#1546be] text-white px-5 py-3 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 transition-all shadow-lg shadow-blue-600/10"
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="p-3 bg-blue-50 text-[#1E5EF3] rounded-xl shrink-0">
-                      {offer.type === 'percentage' ? <Percent className="w-5 h-5" /> : <Gift className="w-5 h-5" />}
+                <Plus className="w-4 h-4" /> Create Coupon
+              </button>
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="flex justify-center py-24"><LoadingDots /></div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {offers.map(offer => {
+                const hasExpired = new Date(offer.end_date) < new Date();
+                return (
+                  <div 
+                    key={offer.id}
+                    className={cn(
+                      "bg-white rounded-2xl border border-slate-200/60 overflow-hidden shadow-sm flex flex-col justify-between p-6 space-y-4",
+                      !offer.is_active || hasExpired ? "opacity-65" : "hover:shadow-md transition-all"
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="p-3 bg-blue-50 text-[#1E5EF3] rounded-xl shrink-0">
+                          {offer.type === 'percentage' ? <Percent className="w-5 h-5" /> : <Gift className="w-5 h-5" />}
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-black text-slate-900 uppercase tracking-tight">{offer.name}</h4>
+                          {offer.code && (
+                            <span className="text-[9px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-800 border border-emerald-100 px-2 py-0.5 rounded-md mt-1 inline-block">
+                              Code: {offer.code}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+                        <button
+                          onClick={() => handleToggleOffer(offer)}
+                          className={cn(
+                            "p-1 rounded-lg transition-all",
+                            offer.is_active ? "text-emerald-500 hover:bg-emerald-50" : "text-slate-400 hover:bg-slate-100"
+                          )}
+                        >
+                          {offer.is_active ? <ToggleRight className="w-6 h-6" /> : <ToggleLeft className="w-6 h-6" />}
+                        </button>
+                        <button
+                          onClick={() => handleDeleteOffer(offer.id)}
+                          className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="text-xs font-black text-slate-900 uppercase tracking-tight">{offer.name}</h4>
-                      {offer.code && (
-                        <span className="text-[9px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-800 border border-emerald-100 px-2 py-0.5 rounded-md mt-1 inline-block">
-                          Code: {offer.code}
+
+                    <p className="text-[11px] text-slate-500 font-medium leading-relaxed">{offer.description}</p>
+
+                    <div className="bg-slate-50 p-3 rounded-xl space-y-1 text-[10px] font-bold text-slate-600">
+                      <div className="flex justify-between">
+                        <span>Discount Value</span>
+                        <span className="text-slate-900 font-black">
+                          {offer.type === 'percentage' ? `${offer.discount}% OFF` : `৳${offer.discount} Flat`}
                         </span>
-                      )}
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Min Order Requirement</span>
+                        <span className="text-slate-900 font-black">৳{offer.min_order || 0}</span>
+                      </div>
+                      <div className="flex justify-between items-center pt-1 border-t border-slate-100 text-[9px] font-black text-slate-400 uppercase tracking-wider">
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5 text-slate-300" />
+                          Expires: {new Date(offer.end_date).toLocaleDateString()}
+                        </span>
+                        {hasExpired && <span className="text-rose-500 font-bold uppercase tracking-widest">Expired</span>}
+                      </div>
                     </div>
                   </div>
+                );
+              })}
 
-                  <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
-                    <button
-                      onClick={() => handleToggleOffer(offer)}
-                      className={cn(
-                        "p-1 rounded-lg transition-all",
-                        offer.is_active ? "text-emerald-500 hover:bg-emerald-50" : "text-slate-400 hover:bg-slate-100"
-                      )}
-                    >
-                      {offer.is_active ? <ToggleRight className="w-6 h-6" /> : <ToggleLeft className="w-6 h-6" />}
-                    </button>
-                    <button
-                      onClick={() => handleDeleteOffer(offer.id)}
-                      className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
+              {offers.length === 0 && (
+                <div className="col-span-full border border-dashed border-slate-200 rounded-3xl p-16 text-center bg-white flex flex-col items-center justify-center">
+                  <Gift className="w-12 h-12 text-slate-300 mb-4" />
+                  <p className="text-xs font-black text-slate-900 uppercase tracking-widest">No Promotions Created</p>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Configure active discounts or seasonal percentage coupons to boost sales volume.</p>
                 </div>
-
-                <p className="text-[11px] text-slate-500 font-medium leading-relaxed">{offer.description}</p>
-
-                <div className="bg-slate-50 p-3 rounded-xl space-y-1 text-[10px] font-bold text-slate-600">
-                  <div className="flex justify-between">
-                    <span>Discount Value</span>
-                    <span className="text-slate-900 font-black">
-                      {offer.type === 'percentage' ? `${offer.discount}% OFF` : `৳${offer.discount} Flat`}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Min Order Requirement</span>
-                    <span className="text-slate-900 font-black">৳{offer.min_order || 0}</span>
-                  </div>
-                  <div className="flex justify-between items-center pt-1 border-t border-slate-100 text-[9px] font-black text-slate-400 uppercase tracking-wider">
-                    <span className="flex items-center gap-1">
-                      <Clock className="w-3.5 h-3.5 text-slate-300" />
-                      Expires: {new Date(offer.end_date).toLocaleDateString()}
-                    </span>
-                    {hasExpired && <span className="text-rose-500 font-bold uppercase tracking-widest">Expired</span>}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-
-          {offers.length === 0 && (
-            <div className="col-span-full border border-dashed border-slate-200 rounded-3xl p-16 text-center bg-white flex flex-col items-center justify-center">
-              <Gift className="w-12 h-12 text-slate-300 mb-4" />
-              <p className="text-xs font-black text-slate-900 uppercase tracking-widest">No Promotions Created</p>
-              <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Configure active discounts or seasonal percentage coupons to boost sales volume.</p>
+              )}
             </div>
           )}
-        </div>
+        </>
       )}
 
       {/* Add Offer Modal */}
@@ -364,3 +408,4 @@ export default function OffersPage() {
     </div>
   );
 }
+
