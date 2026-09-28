@@ -12,9 +12,10 @@ interface OrderTableViewProps {
   selectedOrders: Set<string>;
   onToggleSelection: (id: string) => void;
   onSelectAll: () => void;
+  products?: any[];
 }
 
-export default function OrderTableView({ orders, onStatusChange, statusUpdatingId, selectedOrders, onToggleSelection, onSelectAll }: OrderTableViewProps) {
+export default function OrderTableView({ orders, onStatusChange, statusUpdatingId, selectedOrders, onToggleSelection, onSelectAll, products = [] }: OrderTableViewProps) {
   const getStatusColor = (status: Order['status']) => {
     switch (status) {
       case 'pending': return 'bg-amber-100/80 text-amber-800 border border-amber-200/50';
@@ -93,13 +94,23 @@ export default function OrderTableView({ orders, onStatusChange, statusUpdatingI
                 </td>
                 <td className="px-3 py-4">
                   <div className="flex items-center gap-3 min-w-[200px]">
-                    {order.product_image ? (
-                      <img src={order.product_image} referrerPolicy="no-referrer" alt="P" className="w-10 h-10 rounded-lg object-cover border border-slate-200 shadow-sm shrink-0" />
-                    ) : (
-                      <div className="w-10 h-10 rounded-lg bg-slate-50 flex items-center justify-center border border-slate-200 shrink-0">
-                        <Package className="w-4 h-4 text-slate-300" />
-                      </div>
-                    )}
+                    {(() => {
+                      let imageToShow = order.product_image;
+                      if (!imageToShow && products && products.length > 0) {
+                        const matchedProduct = products.find(p => p.name?.toLowerCase() === order.product_name?.toLowerCase());
+                        if (matchedProduct && matchedProduct.image) {
+                          imageToShow = matchedProduct.image;
+                        }
+                      }
+                      
+                      return imageToShow ? (
+                        <img src={imageToShow} referrerPolicy="no-referrer" alt="P" className="w-10 h-10 rounded-lg object-cover border border-slate-200 shadow-sm shrink-0" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-lg bg-slate-50 flex items-center justify-center border border-slate-200 shrink-0">
+                          <Package className="w-4 h-4 text-slate-300" />
+                        </div>
+                      );
+                    })()}
                     <span className="text-xs font-bold text-slate-800">{order.product_name || 'Generic'}</span>
                   </div>
                 </td>

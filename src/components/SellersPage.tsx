@@ -268,15 +268,11 @@ export default function SellersPage({ userSession }: SellersPageProps) {
       (o.product_name && sellerProducts.some(p => p.name?.toLowerCase() === o.product_name?.toLowerCase()))
     );
 
-    // Realized Gross Sales (Delivered or Completed)
     const completedOrdersValue = sellerOrders
-      .filter(o => ['delivered', 'completed'].includes(o.status))
+      .filter(o => o.status === 'completed' || o.status === 'delivered' || o.status === 'shipped')
       .reduce((sum, o) => sum + Number(o.price || 0), 0);
 
-    // Cost of goods estimated at 80% (yielding 20% margin)
-    const grossProfit = completedOrdersValue * 0.20;
-    const cogs = completedOrdersValue * 0.75;
-    const adminFees = completedOrdersValue * 0.05;
+    const commissions = completedOrdersValue * 0.25;
 
     // Loss from cancellations
     const cancelledOrdersValue = sellerOrders
@@ -293,6 +289,9 @@ export default function SellersPage({ userSession }: SellersPageProps) {
       : (sellerReviews.length > 0 
           ? Number((sellerReviews.reduce((sum, r) => sum + r.rating, 0) / sellerReviews.length).toFixed(1))
           : 5.0);
+    
+    // Find best selling product
+    const bestProduct = sellerProducts.sort((a,b) => (b.sold || 0) - (a.sold || 0))[0];
 
     return {
       products: sellerProducts,
@@ -300,9 +299,9 @@ export default function SellersPage({ userSession }: SellersPageProps) {
       totalStock,
       totalSold,
       revenue: completedOrdersValue,
-      profit: grossProfit,
-      cogs,
-      adminFees,
+      commissions,
+      profit: completedOrdersValue - commissions,
+      bestProduct,
       loss: cancelledOrdersValue,
       avgRating,
       reviewsCount: sellerReviews.length
@@ -439,80 +438,45 @@ export default function SellersPage({ userSession }: SellersPageProps) {
                       onClick={() => setSelectedDashboardSeller(seller)}
                       className="bg-white rounded-3xl border border-slate-200 p-6 flex flex-col items-center text-center group hover:shadow-md hover:border-slate-300 transition-all duration-300 relative overflow-hidden cursor-pointer"
                     >
-                      {/* Certified Tag */}
                       <div className="absolute top-4 left-4 flex items-center gap-1.5">
-                        <span className="text-[8px] font-black uppercase bg-indigo-50 hover:bg-indigo-100 text-indigo-600 px-2.5 py-1 rounded-full tracking-wider border border-indigo-100/40">
+                        <span className="text-[8px] font-black uppercase bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded-full tracking-wider border border-indigo-100/40">
                           {seller.seller_id || 'PARTNER'}
                         </span>
-                        {seller.is_verified && (
-                          <span className="text-blue-500" title="pbazar Verified Merchant">
-                            <ShieldCheck className="w-4 h-4 fill-blue-500 text-white" />
-                          </span>
-                        )}
                       </div>
 
-                      <div className="w-18 h-18 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center mt-3 mb-4 overflow-hidden relative">
+                      <div className="w-20 h-20 rounded-full bg-slate-50 border-4 border-white shadow-md flex items-center justify-center mt-3 mb-4 overflow-hidden relative">
                         {seller.logo ? (
                           <img src={seller.logo} alt={seller.name} className="w-full h-full object-cover" />
                         ) : (
-                          <Store className="w-7 h-7 text-slate-300" />
+                          <Store className="w-8 h-8 text-slate-300" />
                         )}
                       </div>
                       
-                      <h3 className="font-black text-slate-800 uppercase tracking-tight text-base mb-1 truncate w-full px-2 flex items-center justify-center gap-1">
-                        <span>{seller.name}</span>
-                        {seller.is_verified && (
-                          <ShieldCheck className="w-4 h-4 fill-blue-500 text-white flex-shrink-0" title="pbazar Verified Merchant" />
-                        )}
+                      <h3 className="font-black text-slate-900 uppercase tracking-tight text-base mb-0.5 truncate w-full px-2">
+                        {seller.name}
                       </h3>
-                      <p className="text-[10px] text-slate-450 font-bold uppercase tracking-widest mb-4">Stock Value: {formatCurrency(m.products.reduce((acc, p) => acc + ((p.stock || 0) * p.price), 0))}</p>
+                      <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">
+                        <Phone className="w-3 h-3 inline mr-1" />{seller.whatsapp_number}
+                      </p>
+                      <p className="text-[10px] text-indigo-600 font-black uppercase tracking-widest mb-4">
+                        25% Commission: {formatCurrency(m.commissions)}
+                      </p>
                       
-                      {/* Metric Strips */}
-                      <div className="grid grid-cols-3 gap-2 w-full bg-slate-50 p-2.5 rounded-2xl mb-5">
-                        <div className="text-center">
-                          <div className="text-[8px] font-bold text-slate-400 uppercase tracking-wider">Stock</div>
-                          <div className="text-xs font-black text-slate-700 mt-0.5">{m.totalStock} pcs</div>
+                      {m.bestProduct && (
+                        <div className="w-full bg-slate-50 rounded-xl p-3 mb-4">
+                            <p className="text-[8px] font-black text-slate-400 uppercase tracking-wider">Best Product</p>
+                            <p className="text-xs font-bold text-slate-800 mt-0.5 truncate">{m.bestProduct.name}</p>
                         </div>
-                        <div className="text-center border-x border-slate-200">
-                          <div className="text-[8px] font-bold text-slate-400 uppercase tracking-wider">Products</div>
-                          <div className="text-xs font-black text-slate-700 mt-0.5">{m.products.length}</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-[8px] font-bold text-slate-400 uppercase tracking-wider">Rating</div>
-                          <div className="text-xs font-black text-amber-500 mt-0.5 flex items-center justify-center gap-0.5">
-                            <Star className="w-3 h-3 fill-amber-400 stroke-amber-400" />
-                            {m.avgRating}
-                          </div>
-                        </div>
-                      </div>
+                      )}
 
                       <div className="flex items-center justify-between w-full mt-auto pt-3 border-t border-slate-100 gap-2.5">
-                        {(isAdmin || seller.seller_id === currentSellerId) && (
-                          <button 
-                            onClick={(e) => handleEdit(seller, e)}
-                            className="p-2 bg-slate-50 text-slate-600 rounded-xl hover:bg-slate-100 transition-colors border border-slate-200 hover:text-slate-900 cursor-pointer text-xs"
-                            title="Edit Partner"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
                         <button 
                           onClick={() => setSelectedDashboardSeller(seller)}
-                          className="flex-1 py-1.5 bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white rounded-xl text-[9px] font-black uppercase tracking-widest transition-all duration-300 border border-indigo-100/40 hover:border-indigo-600 cursor-pointer flex items-center justify-center gap-1.5"
+                          className="flex-1 py-2 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all hover:bg-indigo-700 cursor-pointer flex items-center justify-center gap-1.5"
                         >
-                          <LayoutDashboard className="w-3 h-3" />
-                          Dashboard
+                          <LayoutDashboard className="w-3.5 h-3.5" />
+                          View Dashboard
                         </button>
-                        {isAdmin && (
-                          <button 
-                            onClick={(e) => handleDelete(seller.id, e)}
-                            disabled={deletingId === seller.id}
-                            className="p-2 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-100 transition-colors border border-rose-200/50 cursor-pointer text-xs"
-                            title="Delete Partner"
-                          >
-                            {deletingId === seller.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                          </button>
-                        )}
                       </div>
                     </div>
                   );
@@ -528,11 +492,11 @@ export default function SellersPage({ userSession }: SellersPageProps) {
                     <thead>
                       <tr className="bg-slate-50 border-b border-slate-200/50">
                         <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Seller Name / Id</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Contact Number</th>
                         <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Active Products</th>
-                        <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Total Stock</th>
-                        <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Realized revenue</th>
-                        <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Estimated profits</th>
-                        <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Merchant Rating</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Realized Revenue</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-slate-550 uppercase tracking-widest text-[#6366f1]">25% Commission</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Best Product</th>
                         <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">Actions</th>
                       </tr>
                     </thead>
@@ -563,22 +527,19 @@ export default function SellersPage({ userSession }: SellersPageProps) {
                                 <div className="text-[9px] text-slate-400 font-bold uppercase mt-0.5">{seller.seller_id || seller.id.slice(0, 8)}</div>
                               </div>
                             </td>
-                            <td className="px-6 py-4 text-xs font-extrabold text-slate-650">{m.products.length} listed items</td>
-                            <td className="px-6 py-4 text-xs font-extrabold text-slate-700">
-                              <span className={cn(
-                                "px-2 py-1 rounded-lg text-[10px] font-black border",
-                                m.totalStock === 0 ? "bg-red-50 text-red-700 border-red-100" : "bg-emerald-50 text-emerald-700 border-emerald-100"
-                              )}>
-                                {m.totalStock} units
+                            <td className="px-6 py-4 text-xs font-bold text-slate-650">
+                              <span className="flex items-center gap-1">
+                                <Phone className="w-3.5 h-3.5 text-slate-400" />
+                                {seller.whatsapp_number || 'N/A'}
                               </span>
                             </td>
+                            <td className="px-6 py-4 text-xs font-extrabold text-slate-650">
+                              {m.products.length} items ({m.totalStock} units)
+                            </td>
                             <td className="px-6 py-4 text-xs font-black text-slate-800">{formatCurrency(m.revenue)}</td>
-                            <td className="px-6 py-4 text-xs font-black text-emerald-600">{formatCurrency(m.profit)}</td>
-                            <td className="px-6 py-4">
-                              <div className="flex items-center gap-1">
-                                <Star className="w-3.5 h-3.5 fill-amber-400 stroke-amber-400" />
-                                <span className="text-xs font-black text-slate-700">{m.avgRating}</span>
-                              </div>
+                            <td className="px-6 py-4 text-xs font-black text-[#6366f1]">{formatCurrency(m.commissions)}</td>
+                            <td className="px-6 py-4 text-xs font-bold text-slate-700 max-w-[155px] truncate">
+                              {m.bestProduct ? m.bestProduct.name : <span className="text-slate-400">N/A</span>}
                             </td>
                             <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                               <div className="inline-flex items-center gap-1.5">

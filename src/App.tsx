@@ -8,15 +8,12 @@ import ReviewsPage from './components/ReviewsPage';
 import UsersPage from './components/UsersPage';
 import SellersPage from './components/SellersPage';
 import SettingsPage from './components/SettingsPage';
-import CafeManagementPage from './components/CafeManagementPage';
-import AnalyticsPage from './components/AnalyticsPage';
-import FoodPage from './components/FoodPage';
-import FoodOrdersPage from './components/FoodOrdersPage';
 import InventoryPage from './components/InventoryPage';
 import OffersPage from './components/OffersPage';
 import CustomersPage from './components/CustomersPage';
 import NotificationsPage from './components/NotificationsPage';
 import LoginPage from './components/LoginPage';
+import ProfilePage from './components/ProfilePage';
 import LinkConverterModal from './components/LinkConverterModal';
 import PopupAd from './components/PopupAd';
 import MobileNav from './components/MobileNav';
@@ -29,7 +26,7 @@ import { collection, onSnapshot, query, where, getDocs, updateDoc, doc, limit, o
 import { cn } from './lib/utils';
 
 export interface UserSession {
-  role: 'admin' | 'seller';
+  role: 'admin' | 'product_seller' | 'food_seller';
   name?: string;
   sellerId?: string;
 }
@@ -227,6 +224,11 @@ export default function App() {
     setUserSession(session);
     Storage.setSmall('isAdminAuthenticated', 'true');
     Storage.setSmall('userSession', JSON.stringify(session));
+
+    // Redirect based on role
+    if (session.role === 'product_seller') setCurrentView('products');
+    else if (session.role === 'food_seller') setCurrentView('food');
+    else setCurrentView('dashboard');
   };
 
   const handleLogout = () => {
@@ -237,70 +239,41 @@ export default function App() {
   };
 
   const renderView = () => {
-    const isSeller = userSession?.role === 'seller';
+    if (!userSession) return <Dashboard onViewChange={setCurrentView} />;
     
-    // Auto-redirect sellers to products if they try to access prohibited areas
-    if (isSeller && ['workers', 'banners', 'settings', 'users', 'reviews'].includes(currentView)) {
-      return (
-        <ProductsPage 
-            defaultCategory={filterCategory}
-            onCategoryFilterChange={setFilterCategory}
-            onViewChange={setCurrentView}
-            userSession={userSession}
-        />
-      );
+    // Strict Role-Based Access Control
+    if (userSession.role === 'product_seller') {
+        const allowed = ['dashboard', 'products', 'orders', 'inventory', 'notifications', 'profile'];
+        if (!allowed.includes(currentView)) return <ProductsPage defaultCategory={filterCategory} onViewChange={setCurrentView} userSession={userSession} />;
     }
 
     switch (currentView) {
       case 'dashboard':
-        return (
-          <Dashboard 
-            onViewChange={setCurrentView} 
-            defaultCategory={filterCategory}
-            onCategoryFilterChange={(cat) => {
-              setFilterCategory(cat);
-              setCurrentView('products');
-            }}
-            userSession={userSession}
-          />
-        );
+        return <Dashboard onViewChange={setCurrentView} defaultCategory={filterCategory} onCategoryFilterChange={setFilterCategory} userSession={userSession} />;
       case 'products':
-        return (
-          <ProductsPage 
-            defaultCategory={filterCategory}
-            onCategoryFilterChange={setFilterCategory}
-            onViewChange={setCurrentView}
-            userSession={userSession}
-          />
-        );
+        return <ProductsPage defaultCategory={filterCategory} onCategoryFilterChange={setFilterCategory} onViewChange={setCurrentView} userSession={userSession} />;
       case 'orders':
         return <OrdersPage userSession={userSession} />;
-      case 'banners':
-        return <BannersPage />;
-      case 'reviews':
-        return <ReviewsPage />;
-      case 'users':
-        return <UsersPage onViewChange={setCurrentView} />;
-      case 'sellers':
-        return <SellersPage userSession={userSession} />;
-      case 'settings':
-        return <SettingsPage />;
-      case 'cafe-management':
-        return <CafeManagementPage />;
-      case 'analytics':
-        return <AnalyticsPage />;
-      case 'food':
-        return <FoodPage />;
-      case 'food-orders':
-        return <FoodOrdersPage />;
       case 'inventory':
         return <InventoryPage />;
-      case 'offers':
-        return <OffersPage />;
+      case 'sellers':
+        return <SellersPage userSession={userSession} />;
       case 'customers':
         return <CustomersPage />;
+      case 'profile':
+        return <ProfilePage userSession={userSession} />;
+      case 'offers':
+        return <OffersPage />;
+      case 'banners':
+        return <BannersPage />;
+      case 'analytics':
+        return <AnalyticsPage />;
       case 'notifications':
         return <NotificationsPage />;
+      case 'reviews':
+        return <ReviewsPage />;
+      case 'settings':
+        return <SettingsPage />;
       default:
         return <Dashboard onViewChange={setCurrentView} />;
     }

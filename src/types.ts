@@ -97,95 +97,23 @@ export interface Seller {
   id: string;
   seller_id?: string;
   password?: string;
-  name: string;
+  pin?: string;
+  name: string; // Shop Name
+  owner_name?: string;
   logo: string;
   whatsapp_number: string;
+  shop_address?: string;
   email?: string;
   facebook?: string;
   instagram?: string;
   tiktok?: string;
+  role: 'product_seller' | 'food_seller';
   created_at: string;
   is_verified?: boolean;
   rating?: number;
 }
 
-export interface CafeProduct {
-  id: string;
-  name: string;
-  price: number;
-  category: 'Drinks' | 'Food' | 'Snacks' | 'Desserts';
-  image: string;
-  description: string;
-  created_at: string;
-  stock?: number;
-}
-
-export interface CafeOrder {
-  id: string;
-  customer_name: string;
-  whatsapp_number: string;
-  location: string;
-  price: number;
-  product_name: string;
-  product_image?: string;
-  quantity: number;
-  status: 'pending' | 'preparing' | 'completed' | 'cancelled';
-  created_at: string;
-  delivery_charge?: number;
-  shop_name?: string;
-}
-
-export type View = 'dashboard' | 'products' | 'orders' | 'banners' | 'reviews' | 'users' | 'sellers' | 'settings' | 'employees' | 'cafe-management' | 'food' | 'food-orders' | 'inventory' | 'offers' | 'analytics' | 'customers' | 'notifications';
-
-export interface FoodItem {
-  id: string;
-  name: string;
-  category: string;
-  description: string;
-  ingredients?: string;
-  image: string;
-  additional_images?: string[];
-  price: number; // Small or default price
-  discount?: number;
-  final_price: number;
-  sizes?: {
-    small: number;
-    medium: number;
-    large: number;
-  };
-  stock: number;
-  preparation_time?: string;
-  calories?: string;
-  spicy_level?: 'none' | 'mild' | 'medium' | 'hot' | 'extra_hot';
-  is_available: boolean;
-  is_featured?: boolean;
-  is_popular?: boolean;
-  rating?: number;
-  sold_quantity?: number;
-  created_at: string;
-}
-
-export interface FoodOrder {
-  id: string;
-  customer_name: string;
-  whatsapp_number: string;
-  location: string;
-  food_items: {
-    id: string;
-    name: string;
-    quantity: number;
-    size: 'small' | 'medium' | 'large' | 'default';
-    price: number;
-  }[];
-  price: number; // Final subtotal
-  delivery_charge: number;
-  discount: number;
-  total: number;
-  payment_method: 'cash' | 'card' | 'mobile_banking';
-  payment_status: 'pending' | 'paid';
-  status: 'pending' | 'accepted' | 'preparing' | 'ready' | 'picked_up' | 'on_the_way' | 'delivered' | 'completed' | 'cancelled';
-  created_at: string;
-}
+export type View = 'dashboard' | 'products' | 'orders' | 'banners' | 'reviews' | 'users' | 'sellers' | 'settings' | 'employees' | 'inventory' | 'offers' | 'analytics' | 'customers' | 'notifications' | 'profile';
 
 export interface InventoryItem {
   id: string;

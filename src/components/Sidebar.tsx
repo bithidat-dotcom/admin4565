@@ -1,8 +1,8 @@
 import React from 'react';
 import { 
   LayoutDashboard, ShoppingBag, ShoppingCart, Star, Users, X, 
-  Link as LinkIcon, Store, Settings, LogOut, Coffee, BarChart3, 
-  UtensilsCrossed, Warehouse, Tag, Bell, Menu, ShieldAlert 
+  Link as LinkIcon, Store, Settings, LogOut, BarChart3, 
+  Warehouse, Tag, Bell, Menu, ShieldAlert 
 } from 'lucide-react';
 import { View } from '../types';
 import { cn } from '../lib/utils';
@@ -21,18 +21,16 @@ export default function Sidebar({ currentView, onViewChange, isOpen = false, onC
   const isSeller = userSession?.role === 'seller';
 
   const menuItems = [
-    { id: 'dashboard' as View, icon: LayoutDashboard, label: 'Dashboard', sellerAllowed: true },
-    { id: 'orders' as View, icon: ShoppingCart, label: 'Orders', sellerAllowed: true },
-    { id: 'analytics' as View, icon: BarChart3, label: 'Analytics', sellerAllowed: false },
-    { id: 'products' as View, icon: ShoppingBag, label: 'Products', sellerAllowed: true },
-    { id: 'food' as View, icon: UtensilsCrossed, label: 'Food Section', sellerAllowed: true },
-    { id: 'inventory' as View, icon: Warehouse, label: 'Inventory', sellerAllowed: true },
-    { id: 'offers' as View, icon: Tag, label: 'Offers', sellerAllowed: false },
-    { id: 'customers' as View, icon: Users, label: 'Customers', sellerAllowed: false },
-    { id: 'reviews' as View, icon: Star, label: 'Reviews', sellerAllowed: false },
-    { id: 'notifications' as View, icon: Bell, label: 'Notifications', sellerAllowed: true },
-    { id: 'settings' as View, icon: Settings, label: 'Settings', sellerAllowed: false },
-  ].filter(item => !isSeller || item.sellerAllowed);
+    { id: 'dashboard' as View, icon: LayoutDashboard, label: 'Dashboard', allowedRoles: ['admin', 'product_seller'] },
+    { id: 'orders' as View, icon: ShoppingCart, label: 'Product Orders', allowedRoles: ['admin', 'product_seller'] },
+    { id: 'analytics' as View, icon: BarChart3, label: 'Analytics', allowedRoles: ['admin'] },
+    { id: 'products' as View, icon: ShoppingBag, label: 'Products', allowedRoles: ['admin', 'product_seller'] },
+    { id: 'inventory' as View, icon: Warehouse, label: 'Inventory', allowedRoles: ['admin', 'product_seller'] },
+    { id: 'sellers' as View, icon: Store, label: 'Sellers Hub', allowedRoles: ['admin'] },
+    { id: 'customers' as View, icon: Users, label: 'Customers', allowedRoles: ['admin'] },
+    { id: 'offers' as View, icon: Tag, label: 'Coupons & Banners', allowedRoles: ['admin'] },
+    { id: 'notifications' as View, icon: Bell, label: 'Notifications', allowedRoles: ['admin', 'product_seller'] },
+  ].filter(item => !userSession || item.allowedRoles.includes(userSession.role));
 
   return (
     <>
@@ -136,30 +134,31 @@ export default function Sidebar({ currentView, onViewChange, isOpen = false, onC
 
         {/* Footer Admin Profile */}
         <div className="p-4 border-t border-white/10 bg-black/10">
-          <div className="flex items-center gap-3 p-2 bg-white/5 rounded-xl border border-white/10">
-            <div className="w-9 h-9 rounded-lg bg-emerald-400 flex items-center justify-center text-slate-950 font-black text-xs shrink-0 shadow-inner">
-              {userSession?.role === 'admin' ? 'AD' : userSession?.name?.slice(0, 2).toUpperCase()}
+          <button
+            type="button"
+            onClick={() => onViewChange('profile')}
+            className="w-full flex items-center gap-3 p-2 bg-white/5 rounded-2xl border border-white/10 hover:bg-white/10 transition-all"
+          >
+            <div className="w-9 h-9 rounded-xl bg-white text-[#1E5EF3] flex items-center justify-center font-black text-xs shrink-0 shadow-inner">
+              {userSession?.name?.slice(0, 2).toUpperCase()}
             </div>
             <div className="flex flex-col overflow-hidden text-left">
               <span className="text-[10px] font-black text-white uppercase truncate">
-                {userSession?.role === 'admin' ? 'pbazar Admin' : userSession?.name}
+                {userSession?.name}
               </span>
-              <div className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-[8px] text-white/60 font-bold uppercase tracking-wider leading-none">
-                  {userSession?.role === 'admin' ? 'Root Access' : `ID: ${userSession?.sellerId}`}
-                </span>
-              </div>
+              <span className="text-[8px] text-white/60 font-bold uppercase tracking-wider leading-none">
+                View Profile
+              </span>
             </div>
-          </div>
+          </button>
           
           <button
             type="button"
             onClick={onLogout}
-            className="w-full flex items-center gap-2 px-3 py-2.5 mt-2 rounded-xl text-[10px] font-black uppercase tracking-widest text-red-300 hover:bg-red-500/20 hover:text-white transition-all duration-300 cursor-pointer"
+            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 mt-2 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-red-500/20 text-white hover:bg-red-500/40 transition-all duration-300 cursor-pointer"
           >
             <LogOut className="w-3.5 h-3.5" />
-            <span>Logout System</span>
+            <span>Logout</span>
           </button>
         </div>
       </aside>

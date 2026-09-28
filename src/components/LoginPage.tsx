@@ -30,9 +30,15 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   // Registration Form State
   const [regData, setRegData] = useState({
     name: '',
+    owner_name: '',
+    shop_address: '',
+    role: 'product_seller' as 'product_seller' | 'food_seller',
+    pin: '',
     seller_id: '',
     logo: '',
     whatsapp_number: '',
+    facebook: '',
+    instagram: '',
     email: ''
   });
 
@@ -47,7 +53,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
 
   const handleSellerLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!sellerIdInput.trim()) return;
+    if (!sellerIdInput.trim() || !pin) return;
 
     setLoading(true);
     setError('');
@@ -58,7 +64,11 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
 
       if (!snap.empty) {
         const sellerData = snap.docs[0].data() as Seller;
-        onLogin({ role: 'seller', name: sellerData.name, sellerId: sellerData.seller_id });
+        if (sellerData.pin === pin) {
+            onLogin({ role: sellerData.role, name: sellerData.name, sellerId: sellerData.seller_id });
+        } else {
+            setError('Invalid PIN.');
+        }
       } else {
         setError('Seller ID not found. Please register first.');
       }
@@ -211,6 +221,18 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                                 className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-brand focus:border-transparent outline-none transition-all font-black uppercase tracking-widest text-[#6366f1]"
                             />
                         </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Secure PIN</label>
+                            <input
+                                type="password"
+                                inputMode="numeric"
+                                value={pin}
+                                onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                                placeholder="••••"
+                                required
+                                className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-brand focus:border-transparent outline-none transition-all font-mono text-center tracking-[1em]"
+                            />
+                        </div>
                         {error && <p className="text-rose-500 text-[10px] font-black uppercase tracking-wider text-center bg-rose-50 p-2 rounded-lg">{error}</p>}
                         <button
                             type="submit"
@@ -236,8 +258,54 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                                     required
                                     value={regData.name}
                                     onChange={e => setRegData({...regData, name: e.target.value})}
-                                    placeholder="Enter business name"
+                                    placeholder="Enter shop name"
                                     className="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-bold uppercase tracking-tight outline-none focus:border-brand"
+                                />
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Owner Name</label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={regData.owner_name}
+                                    onChange={e => setRegData({...regData, owner_name: e.target.value})}
+                                    placeholder="Enter owner name"
+                                    className="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-bold uppercase tracking-tight outline-none focus:border-brand"
+                                />
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Shop Address</label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={regData.shop_address}
+                                    onChange={e => setRegData({...regData, shop_address: e.target.value})}
+                                    placeholder="Enter shop address"
+                                    className="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-bold uppercase tracking-tight outline-none focus:border-brand"
+                                />
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Role</label>
+                                <select
+                                    required
+                                    value={regData.role}
+                                    onChange={e => setRegData({...regData, role: e.target.value as any})}
+                                    className="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-bold uppercase tracking-tight outline-none focus:border-brand"
+                                >
+                                    <option value="product_seller">Product Seller</option>
+                                    <option value="food_seller">Food Seller</option>
+                                </select>
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">PIN (4 digits)</label>
+                                <input
+                                    type="password"
+                                    required
+                                    maxLength={4}
+                                    value={regData.pin}
+                                    onChange={e => setRegData({...regData, pin: e.target.value.replace(/\D/g, '')})}
+                                    placeholder="••••"
+                                    className="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-black uppercase tracking-widest text-indigo-600 outline-none focus:border-brand text-center"
                                 />
                             </div>
                             <div className="space-y-1.5">
@@ -265,6 +333,26 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                                         className="w-full pl-10 pr-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-bold outline-none focus:border-brand"
                                     />
                                 </div>
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Facebook Profile URL</label>
+                                <input
+                                    type="url"
+                                    value={regData.facebook}
+                                    onChange={e => setRegData({...regData, facebook: e.target.value})}
+                                    placeholder="facebook.com/..."
+                                    className="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-bold outline-none focus:border-brand"
+                                />
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Instagram Profile URL (Optional)</label>
+                                <input
+                                    type="url"
+                                    value={regData.instagram}
+                                    onChange={e => setRegData({...regData, instagram: e.target.value})}
+                                    placeholder="instagram.com/..."
+                                    className="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-bold outline-none focus:border-brand"
+                                />
                             </div>
                             <div className="space-y-1.5 pt-2">
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1 flex items-center justify-between">

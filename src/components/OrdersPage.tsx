@@ -890,6 +890,7 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
                 selectedOrders={selectedOrders}
                 onToggleSelection={toggleSelection}
                 onSelectAll={selectAll}
+                products={products}
               />
             ) : (
                 <AnimatePresence mode="popLayout">

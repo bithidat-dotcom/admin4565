@@ -29,7 +29,8 @@ import {
   Wifi,
   WifiOff,
   Database,
-  RefreshCw
+  RefreshCw,
+  Tag
 } from 'lucide-react';
 import { formatCurrency, cn } from '../lib/utils';
 import { Storage } from '../lib/storage';
@@ -301,6 +302,7 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
     { label: 'DELIVERY REVENUE', value: formatCurrency(stats.totalRevenue), icon: TrendingUp, color: 'text-indigo-500', bg: 'bg-indigo-50/75 border border-indigo-100', change: 'Active & complete', changeColor: 'text-indigo-550' },
     { label: 'PRODUCTS TOTAL', value: stats.totalProducts.toString(), icon: ShoppingBag, color: 'text-slate-700', bg: 'bg-slate-50 border border-slate-200/60', change: `${totalStock} in stock • ${totalSold} sold`, changeColor: 'text-slate-500' },
     !isSeller && { label: 'SELLERS BASE', value: stats.totalSellers.toString(), icon: Users, color: 'text-purple-500', bg: 'bg-purple-50 border border-purple-100', change: `${stats.totalUsers} customers`, changeColor: 'text-purple-550' },
+    !isSeller && { label: 'COUPONS & BANNERS', value: stats.totalBanners.toString(), icon: Tag, color: 'text-pink-500', bg: 'bg-pink-50 border border-pink-100', change: 'Active Campaigns', changeColor: 'text-pink-550' },
   ].filter(Boolean) as any[];
 
   const cancelledOrders = recentOrders.filter(o => o.status === 'cancelled').slice(0, 3);
@@ -391,8 +393,32 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
                       </div>
                       {stat.label === 'SELLERS BASE' && (
                         <button 
-                          onClick={() => onViewChange?.('users')}
-                          className="text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all cursor-pointer"
+                          onClick={() => onViewChange?.('sellers')}
+                          className="text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md bg-purple-50 text-purple-600 hover:bg-purple-600 hover:text-white transition-all cursor-pointer"
+                        >
+                          VIEW
+                        </button>
+                      )}
+                      {stat.label === 'TOTAL SALES COUNT' && (
+                        <button 
+                          onClick={() => onViewChange?.('orders')}
+                          className="text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md bg-blue-50 text-brand hover:bg-brand hover:text-white transition-all cursor-pointer"
+                        >
+                          VIEW
+                        </button>
+                      )}
+                      {stat.label === 'PRODUCTS TOTAL' && (
+                        <button 
+                          onClick={() => onViewChange?.('products')}
+                          className="text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-700 hover:bg-slate-700 hover:text-white transition-all cursor-pointer"
+                        >
+                          VIEW
+                        </button>
+                      )}
+                      {stat.label === 'COUPONS & BANNERS' && (
+                        <button 
+                          onClick={() => onViewChange?.('offers')}
+                          className="text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md bg-pink-50 text-pink-600 hover:bg-pink-600 hover:text-white transition-all cursor-pointer"
                         >
                           VIEW
                         </button>
@@ -409,16 +435,16 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
             </div>
 
             {/* Dashboard Workspace / Definition Pen Tool Memo Board - Hidden on mobile */}
-            <div className="hidden md:block bg-white rounded-3xl p-6 border border-slate-200 shadow-sm relative overflow-hidden group">
-              <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-indigo-50/60 border border-indigo-100/40 text-indigo-600 rounded-2xl">
-                    <PenTool className="w-5 h-5 text-indigo-500" />
+            <div className="hidden md:block bg-slate-900 rounded-3xl p-8 border border-slate-700 shadow-xl relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none" />
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-indigo-900/50 border border-indigo-700 text-indigo-400 rounded-2xl">
+                    <PenTool className="w-6 h-6" />
                   </div>
                   <div>
-                    <h2 className="text-xs font-black uppercase tracking-[0.2em] text-slate-700">Dashboard Definition Pad</h2>
-                    <p className="text-[9px] text-slate-450 font-bold uppercase tracking-wider">Set workspace guidelines and metrics</p>
+                    <h2 className="text-sm font-black uppercase tracking-[0.2em] text-white">Dashboard Definition Pad</h2>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Set workspace guidelines and metrics</p>
                   </div>
                 </div>
                 
@@ -429,16 +455,16 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
                     }
                     setIsNoteEditing(!isNoteEditing);
                   }}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-50 hover:bg-slate-100/80 text-slate-700 border border-slate-200 text-[10px] font-black uppercase tracking-widest transition-all duration-300 cursor-pointer shadow-sm"
+                  className="flex items-center gap-2 px-5 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 text-[10px] font-black uppercase tracking-widest transition-all duration-300 cursor-pointer shadow-lg"
                 >
                   {isNoteEditing ? (
                     <>
-                      <Check className="w-3.5 h-3.5 text-emerald-500" />
+                      <Check className="w-4 h-4 text-emerald-400" />
                       Save Definition
                     </>
                   ) : (
                     <>
-                      <PenTool className="w-3.5 h-3.5 text-slate-500" />
+                      <PenTool className="w-4 h-4 text-slate-400" />
                       Edit Pad
                     </>
                   )}
@@ -449,12 +475,12 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
                 <textarea
                   value={boardNote}
                   onChange={(e) => setBoardNote(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500/55 focus:outline-none rounded-2xl p-4 text-xs font-bold leading-relaxed text-slate-700 uppercase"
+                  className="w-full bg-slate-800 border border-slate-700 focus:border-indigo-500/55 focus:outline-none rounded-2xl p-6 text-sm font-bold leading-relaxed text-white uppercase"
                   rows={3}
                   placeholder="Define targets, guidelines, or notice content for this dashboard session..."
                 />
               ) : (
-                <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-mono leading-relaxed text-slate-600 uppercase tracking-wide">
+                <div className="p-6 bg-slate-950 border border-slate-800 rounded-2xl text-sm font-mono leading-relaxed text-slate-400 uppercase tracking-wide">
                   {boardNote}
                 </div>
               )}
