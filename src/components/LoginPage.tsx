@@ -8,7 +8,7 @@ import ImageUploader from './ImageUploader';
 import { cn } from '../lib/utils';
 
 export interface UserSession {
-  role: 'admin' | 'seller';
+  role: 'admin' | 'product_seller' | 'food_seller' | 'seller';
   name?: string;
   sellerId?: string;
 }

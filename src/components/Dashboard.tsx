@@ -30,7 +30,11 @@ import {
   WifiOff,
   Database,
   RefreshCw,
-  Tag
+  Tag,
+  Flame,
+  Lightbulb,
+  ArrowUpRight,
+  Eye
 } from 'lucide-react';
 import { formatCurrency, cn } from '../lib/utils';
 import { Storage } from '../lib/storage';
@@ -76,6 +80,7 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
   const [orders, setOrders] = useState<Order[]>([]);
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [productsList, setProductsList] = useState<Product[]>([]);
+  const [productClicks, setProductClicks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
   const [isShowingGlobal, setIsShowingGlobal] = useState(false);
@@ -688,6 +693,128 @@ export default function Dashboard({ onViewChange, defaultCategory = 'All', onCat
                       No products registered.
                     </div>
                   )}
+                </div>
+              </div>
+            </div>
+
+            {/* BUSINESS GROWTH INTELLIGENCE: BEST-SELLING VS NOT-SELLING PRODUCTS */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Best-Selling Products Card */}
+              <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm flex flex-col">
+                <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                  <div>
+                    <h3 className="font-black text-slate-900 text-base uppercase tracking-tight flex items-center gap-2">
+                      <Flame className="w-5 h-5 text-amber-500 fill-amber-500" />
+                      Best-Selling Products (Revenue Drivers)
+                    </h3>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Top-performing catalog items driving sales volume</p>
+                  </div>
+                  <button 
+                    onClick={() => onViewChange && onViewChange('seo')}
+                    className="text-[10px] font-black uppercase text-[#1E5EF3] hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>Manage SEO</span>
+                    <ArrowUpRight className="w-3 h-3" />
+                  </button>
+                </div>
+
+                <div className="p-6 divide-y divide-slate-100 flex-1 overflow-y-auto max-h-[380px]">
+                  {[...productsList]
+                    .sort((a, b) => (b.sold ?? 0) - (a.sold ?? 0))
+                    .slice(0, 6)
+                    .map((p, idx) => {
+                      const totalRev = (p.sold ?? 0) * p.price;
+                      return (
+                        <div key={p.id} className="flex items-center gap-4 py-3 first:pt-0 last:pb-0">
+                          <span className="font-black text-slate-400 text-xs w-5 text-center">#{idx + 1}</span>
+                          <img 
+                            src={p.image || 'https://i.postimg.cc/KvqR53hq/download-(1).png'} 
+                            alt={p.name} 
+                            referrerPolicy="no-referrer"
+                            className="w-12 h-12 rounded-xl object-cover border border-slate-200 shrink-0" 
+                          />
+                          <div className="flex-1 min-w-0">
+                            <h4 className="text-xs font-black text-slate-900 truncate uppercase">{p.name}</h4>
+                            <div className="flex items-center gap-2 text-[10px] text-slate-500 font-bold mt-0.5">
+                              <span>৳{p.price.toLocaleString()}</span>
+                              {p.is_super_sale && <span className="bg-amber-100 text-amber-900 font-black px-1.5 py-0.2 rounded text-[8px] uppercase">Hot Deal</span>}
+                              <span>Vendor: {p.seller || 'pbazar'}</span>
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <span className="text-xs font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg">
+                              {p.sold ?? 0} Sold
+                            </span>
+                            <p className="text-[9px] font-bold text-slate-400 uppercase mt-0.5">{formatCurrency(totalRev)}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+
+              {/* Not-Selling Products (Underperforming Catalog) with Growth Advice */}
+              <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm flex flex-col">
+                <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                  <div>
+                    <h3 className="font-black text-slate-900 text-base uppercase tracking-tight flex items-center gap-2">
+                      <Lightbulb className="w-5 h-5 text-rose-500" />
+                      Not-Selling Products (Growth Opportunities)
+                    </h3>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Catalog items with low or zero conversions & growth remedies</p>
+                  </div>
+                  <button 
+                    onClick={() => onViewChange && onViewChange('seo')}
+                    className="text-[10px] font-black uppercase text-rose-600 hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>Boost in SEO</span>
+                    <ArrowUpRight className="w-3 h-3" />
+                  </button>
+                </div>
+
+                <div className="p-6 divide-y divide-slate-100 flex-1 overflow-y-auto max-h-[380px]">
+                  {[...productsList]
+                    .sort((a, b) => (a.sold ?? 0) - (b.sold ?? 0))
+                    .slice(0, 6)
+                    .map((p) => {
+                      const soldCount = p.sold ?? 0;
+                      return (
+                        <div key={p.id} className="py-3 first:pt-0 last:pb-0 space-y-1.5">
+                          <div className="flex items-center gap-4">
+                            <img 
+                              src={p.image || 'https://i.postimg.cc/KvqR53hq/download-(1).png'} 
+                              alt={p.name} 
+                              referrerPolicy="no-referrer"
+                              className="w-10 h-10 rounded-xl object-cover border border-slate-200 shrink-0" 
+                            />
+                            <div className="flex-1 min-w-0">
+                              <h4 className="text-xs font-black text-slate-900 truncate uppercase">{p.name}</h4>
+                              <div className="flex items-center gap-2 text-[10px] text-slate-500 font-bold">
+                                <span>৳{p.price.toLocaleString()}</span>
+                                <span className="text-rose-600 font-black">{soldCount} Sold</span>
+                                <span>Stock: {p.stock ?? 0}</span>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => onViewChange && onViewChange('seo')}
+                              className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-[#1E5EF3] rounded-lg text-[9px] font-black uppercase tracking-wider transition-all shrink-0 cursor-pointer"
+                            >
+                              Promote
+                            </button>
+                          </div>
+                          
+                          {/* Business Growth Remedy Note */}
+                          <div className="bg-amber-50/70 p-2 rounded-xl border border-amber-200/50 text-[10px] text-amber-900 font-medium flex items-center gap-1.5">
+                            <span className="font-black text-amber-700 uppercase">Growth Remedy:</span>
+                            <span>
+                              {p.discount === 0 
+                                ? 'Add a 10-15% discount or promote to Super Sale to kickstart buyer interest.'
+                                : 'Optimize keywords and description in SEO tools to capture organic search intent.'}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
                 </div>
               </div>
             </div>

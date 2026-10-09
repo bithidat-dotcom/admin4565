@@ -1,20 +1,30 @@
 @import "tailwindcss";
 
-main {
+@theme {
+  --color-brand: #1E5EF3;
+  --color-brand-dark: #1244BC;
+  --color-brand-light: #EEF4FF;
+}
+
+/* Base custom styles without clashing on component utilities */
+body {
+  color: #0f172a;
   background-color: #f8fafc;
-  border-radius: 2rem;
-  padding: 1.5rem;
+  -webkit-font-smoothing: antialiased;
 }
 
-aside button {
-  border-radius: 1rem;
+/* Ensure clean scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
-
-aside div {
-  border-radius: 1rem;
+::-webkit-scrollbar-track {
+  background: transparent;
 }
-
-header {
-  background-color: #ffffff;
-  border-bottom: 1px solid #e2e8f0;
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.4);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.6);
 }

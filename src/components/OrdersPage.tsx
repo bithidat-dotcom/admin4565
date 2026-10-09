@@ -6,7 +6,7 @@ import Header from '../components/Header';
 import Modal from './Modal';
 import OrderTableView from './OrderTableView';
 import LoadingDots from './LoadingDots';
-import { Loader2, Phone, MapPin, Package, Clock, CheckCircle, Search, Trash2, ShieldCheck, Lock, Copy, Check, MessageSquare, Store, ShoppingBag, Truck, Coins, Printer, MoreVertical, Sparkles, Minus, PlusCircle } from 'lucide-react';
+import { Loader2, Phone, MapPin, Package, Clock, CheckCircle, Search, Trash2, ShieldCheck, Lock, Copy, Check, MessageSquare, Store, ShoppingBag, Truck, Coins, Printer, MoreVertical, Sparkles, Minus, PlusCircle, Ban } from 'lucide-react';
 import { formatCurrency, cn, exportToCSV } from '../lib/utils';
 import { Storage } from '../lib/storage';
 import { format, isSameDay } from 'date-fns';
@@ -446,6 +446,27 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
       handleFirestoreError(err, OperationType.DELETE, `orders/${id}`);
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const handleCancelOrder = async (id: string) => {
+    if (!window.confirm("Are you sure you want to cancel this order? Stock will be restored.")) return;
+    setStatusUpdatingId(id);
+    try {
+      await updateDoc(doc(db, 'orders', id), {
+        status: 'cancelled',
+        cancelled_by: 'admin'
+      });
+      // Also backup status update to host server
+      fetch('/api/order_records', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, status: 'cancelled', cancelled_by: 'admin' })
+      }).catch(() => {});
+    } catch (err: any) {
+      handleFirestoreError(err, OperationType.UPDATE, `orders/${id}`);
+    } finally {
+      setStatusUpdatingId(null);
     }
   };
 
@@ -891,6 +912,8 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
                 onToggleSelection={toggleSelection}
                 onSelectAll={selectAll}
                 products={products}
+                onDeleteOrder={handleDeleteOrder}
+                onCancelOrder={handleCancelOrder}
               />
             ) : (
                 <AnimatePresence mode="popLayout">
@@ -1054,48 +1077,48 @@ export default function OrdersPage({ userSession }: OrdersPageProps) {
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-3">
+                          <div className="flex flex-wrap items-center gap-2.5">
+                            {/* Cancel Order Button */}
+                            {order.status !== 'cancelled' && (
+                              <button
+                                onClick={() => handleCancelOrder(order.id)}
+                                className="flex items-center gap-2 px-5 py-3 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all border border-rose-200 active:scale-95 cursor-pointer shadow-xs"
+                              >
+                                <Ban className="w-3.5 h-3.5 text-rose-600" />
+                                <span>Cancel Order</span>
+                              </button>
+                            )}
+
+                            {/* Delete Button */}
+                            <button
+                              onClick={() => handleDeleteOrder(order.id)}
+                              disabled={deletingId === order.id}
+                              className="flex items-center gap-2 px-4 py-3 bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-600 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all border border-slate-200 active:scale-95 cursor-pointer shadow-xs"
+                              title="Delete Order Record"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Delete</span>
+                            </button>
+
                             <button 
                               onClick={() => handlePrint(order)}
-                              className="flex items-center gap-3 px-8 py-4 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-3xl text-[11px] font-black uppercase tracking-widest transition-all active:scale-95 border border-slate-200/50 shadow-sm"
+                              className="flex items-center gap-2 px-5 py-3 bg-white hover:bg-slate-50 text-slate-700 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 border border-slate-200 shadow-xs cursor-pointer"
                             >
-                              <Printer className="w-4 h-4" />
-                              Print Invoice
+                              <Printer className="w-3.5 h-3.5" />
+                              Invoice
                             </button>
                             
-                            <div className="relative group/menu">
-                              <button className="p-4 bg-brand hover:bg-brand-dark text-white rounded-[24px] shadow-2xl shadow-brand/30 transition-all active:scale-95">
-                                <MoreVertical className="w-6 h-6" />
-                              </button>
-                              
-                              <div className="absolute bottom-full right-0 mb-4 w-64 bg-white rounded-[32px] p-4 shadow-2xl opacity-0 invisible group-hover/menu:opacity-100 group-hover/menu:visible transition-all duration-500 z-50 translate-y-4 group-hover/menu:translate-y-0 backdrop-blur-xl border border-slate-100">
-                                <p className="px-5 py-3 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 mb-3">Lifecycle Control</p>
-                                <div className="grid grid-cols-1 gap-1.5">
-                                  {['pending', 'confirmed', 'packing', 'shipping', 'delivered', 'completed', 'cancelled'].map((status) => (
-                                    <button
-                                      key={status}
-                                      onClick={() => updateStatus(order.id, status as Order['status'])}
-                                      disabled={statusUpdatingId === order.id}
-                                      className={cn(
-                                        "px-5 py-2.5 text-left rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all",
-                                        order.status === status ? "bg-brand text-white shadow-lg shadow-brand/20" : "text-slate-400 hover:bg-slate-50 hover:text-slate-900"
-                                      )}
-                                    >
-                                      {statusUpdatingId === order.id && order.status === status ? <Loader2 className="w-3 h-3 animate-spin mx-auto"/> : status}
-                                    </button>
-                                  ))}
-                                </div>
-                                <div className="mt-3 pt-3 border-t border-slate-50">
-                                  <button 
-                                    onClick={() => handleDeleteOrder(order.id)}
-                                    disabled={deletingId === order.id}
-                                    className="w-full px-5 py-3 text-left text-rose-500 hover:bg-rose-50 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
-                                  >
-                                    Purge Data Record
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
+                            {/* Direct Status Selector for mobile/desktop convenience */}
+                            <select
+                              value={order.status}
+                              onChange={(e) => updateStatus(order.id, e.target.value as Order['status'])}
+                              disabled={statusUpdatingId === order.id}
+                              className="px-3 py-3 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-wider border-0 cursor-pointer shadow-md focus:ring-2 focus:ring-[#1E5EF3] outline-none"
+                            >
+                              {['pending', 'confirmed', 'packing', 'shipping', 'delivered', 'completed', 'cancelled'].map((st) => (
+                                <option key={st} value={st}>{st}</option>
+                              ))}
+                            </select>
                           </div>
                         </div>
                       </div>

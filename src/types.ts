@@ -31,6 +31,30 @@ export interface Product {
   discountExpiresAt?: string;
   is_super_sale?: boolean;
   extra_categories?: string[];
+  // SEO & Promotion Fields
+  meta_title?: string;
+  meta_description?: string;
+  keywords?: string[];
+  slug?: string;
+  seo_score?: number;
+  clicks?: number;
+  views?: number;
+  rank_order?: number;
+  is_demoted?: boolean;
+}
+
+export interface FoodItem {
+  id: string;
+  name: string;
+  price: number;
+  description?: string;
+  image?: string;
+  category?: string;
+  stock?: number;
+  sold_quantity?: number;
+  seller?: string;
+  seller_id?: string;
+  created_at: string;
 }
 
 export interface OrderItem {
@@ -38,6 +62,8 @@ export interface OrderItem {
   price: number;
   quantity: number;
   seller?: string;
+  image?: string;
+  product_id?: string;
 }
 
 export interface Order {
@@ -62,6 +88,8 @@ export interface Order {
   status: 'pending' | 'confirmed' | 'packing' | 'shipping' | 'delivered' | 'completed' | 'cancelled';
   created_at: string;
   items?: OrderItem[];
+  product_id?: string;
+  ip_address?: string;
 }
 
 export interface Banner {
@@ -91,6 +119,8 @@ export interface User {
   wallet_balance?: number;
   last_login?: string;
   created_at: string;
+  ip_address?: string;
+  image?: string;
 }
 
 export interface Seller {
@@ -111,9 +141,59 @@ export interface Seller {
   created_at: string;
   is_verified?: boolean;
   rating?: number;
+  is_frozen?: boolean;
+  cancellation_count?: number;
 }
 
-export type View = 'dashboard' | 'products' | 'orders' | 'banners' | 'reviews' | 'users' | 'sellers' | 'settings' | 'employees' | 'inventory' | 'offers' | 'analytics' | 'customers' | 'notifications' | 'profile';
+export interface CustomerActivity {
+  id: string;
+  customer_id: string;
+  customer_name: string;
+  customer_phone?: string;
+  product_id: string;
+  product_name: string;
+  product_image?: string;
+  click_count: number;
+  last_clicked_at: string;
+  first_clicked_at?: string;
+  ip_address?: string;
+}
+
+export interface ScamAlert {
+  id: string;
+  type: 'product' | 'seller';
+  target_id: string;
+  target_name: string;
+  seller_id?: string;
+  seller_name?: string;
+  risk_level: 'critical' | 'high' | 'medium' | 'safe';
+  risk_score: number;
+  reasons: string[];
+  detected_at: string;
+  status: 'active' | 'resolved' | 'frozen';
+  details?: string;
+}
+
+export type View = 
+  | 'dashboard' 
+  | 'products' 
+  | 'orders' 
+  | 'records' 
+  | 'seo' 
+  | 'scam_catcher' 
+  | 'policies' 
+  | 'banners' 
+  | 'reviews' 
+  | 'users' 
+  | 'sellers' 
+  | 'settings' 
+  | 'employees' 
+  | 'inventory' 
+  | 'offers' 
+  | 'analytics' 
+  | 'customers' 
+  | 'notifications' 
+  | 'profile';
 
 export interface InventoryItem {
   id: string;
@@ -123,6 +203,11 @@ export interface InventoryItem {
   minimum_stock: number;
   sold: number;
   last_updated: string;
+  image?: string;
+  seller?: string;
+  seller_logo?: string;
+  seller_id?: string;
+  price?: number;
 }
 
 export interface PromoOffer {

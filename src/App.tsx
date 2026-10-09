@@ -17,6 +17,11 @@ import ProfilePage from './components/ProfilePage';
 import LinkConverterModal from './components/LinkConverterModal';
 import PopupAd from './components/PopupAd';
 import MobileNav from './components/MobileNav';
+import OrderRecordsPage from './components/OrderRecordsPage';
+import ProductSeoPage from './components/ProductSeoPage';
+import ScamCatcherPage from './components/ScamCatcherPage';
+import SellerPoliciesModal from './components/SellerPoliciesModal';
+import AnalyticsPage from './components/AnalyticsPage';
 import { View } from './types';
 import { motion, AnimatePresence } from 'motion/react';
 import { db, handleFirestoreError, OperationType, isQuotaExceeded } from './lib/firebase';
@@ -26,7 +31,7 @@ import { collection, onSnapshot, query, where, getDocs, updateDoc, doc, limit, o
 import { cn } from './lib/utils';
 
 export interface UserSession {
-  role: 'admin' | 'product_seller' | 'food_seller';
+  role: 'admin' | 'product_seller' | 'food_seller' | 'seller';
   name?: string;
   sellerId?: string;
 }
@@ -243,7 +248,7 @@ export default function App() {
     
     // Strict Role-Based Access Control
     if (userSession.role === 'product_seller') {
-        const allowed = ['dashboard', 'products', 'orders', 'inventory', 'notifications', 'profile'];
+        const allowed = ['dashboard', 'products', 'orders', 'records', 'seo', 'inventory', 'scam_catcher', 'policies', 'notifications', 'profile', 'customers'];
         if (!allowed.includes(currentView)) return <ProductsPage defaultCategory={filterCategory} onViewChange={setCurrentView} userSession={userSession} />;
     }
 
@@ -254,12 +259,20 @@ export default function App() {
         return <ProductsPage defaultCategory={filterCategory} onCategoryFilterChange={setFilterCategory} onViewChange={setCurrentView} userSession={userSession} />;
       case 'orders':
         return <OrdersPage userSession={userSession} />;
+      case 'records':
+        return <OrderRecordsPage userSession={userSession} />;
+      case 'seo':
+        return <ProductSeoPage />;
+      case 'scam_catcher':
+        return <ScamCatcherPage />;
+      case 'policies':
+        return <SellerPoliciesModal isStandalonePage={true} />;
       case 'inventory':
         return <InventoryPage />;
       case 'sellers':
         return <SellersPage userSession={userSession} />;
       case 'customers':
-        return <CustomersPage />;
+        return <CustomersPage userSession={userSession} />;
       case 'profile':
         return <ProfilePage userSession={userSession} />;
       case 'offers':

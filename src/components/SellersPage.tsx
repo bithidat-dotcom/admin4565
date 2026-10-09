@@ -300,6 +300,8 @@ export default function SellersPage({ userSession }: SellersPageProps) {
       totalSold,
       revenue: completedOrdersValue,
       commissions,
+      cogs: completedOrdersValue * 0.75,
+      adminFees: completedOrdersValue * 0.05,
       profit: completedOrdersValue - commissions,
       bestProduct,
       loss: cancelledOrdersValue,

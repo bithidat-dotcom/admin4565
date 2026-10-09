@@ -195,3 +195,114 @@ export const handlePrint = async (order: Order) => {
   }
   await generateInvoicePDF(order);
 };
+
+export const exportOrderRecordsPDF = async (orders: Order[]) => {
+  const pdf = new jsPDF('landscape');
+  
+  // Header with pbazar Logo
+  try {
+    const img = new window.Image();
+    img.src = 'https://i.postimg.cc/KvqR53hq/download-(1).png'; 
+    await new Promise((resolve, reject) => { 
+      img.onload = resolve; 
+      img.onerror = reject;
+      setTimeout(resolve, 2000);
+    });
+    pdf.addImage(img, 'PNG', 14, 10, 18, 18);
+  } catch (e) {
+    console.error("Failed to load logo in PDF report", e);
+  }
+
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(16);
+  pdf.setTextColor(30, 41, 59);
+  pdf.text("PBAZAR COMPLETE ORDER RECORDS REPORT", 36, 18);
+
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(9);
+  pdf.setTextColor(100, 116, 139);
+  pdf.text(`Official eCommerce Audit Sheet · Generated on ${format(new Date(), 'dd MMMM yyyy, hh:mm:ss a')}`, 36, 24);
+
+  // Status Summary Badges
+  const totalCount = orders.length;
+  const completedCount = orders.filter(o => o.status === 'completed' || o.status === 'delivered').length;
+  const cancelledCount = orders.filter(o => o.status === 'cancelled').length;
+  const activeCount = orders.filter(o => ['pending', 'confirmed', 'packing', 'shipping'].includes(o.status)).length;
+  const totalRevenue = orders.reduce((sum, o) => {
+    const orderPrice = o.items && o.items.length > 0
+      ? o.items.reduce((s: number, i: any) => s + (Number(i.price) * (Number(i.quantity) || 1)), 0)
+      : (Number(o.price) || 0) * (Number(o.quantity) || 1);
+    return sum + orderPrice + (Number(o.delivery_charge) || 120);
+  }, 0);
+
+  pdf.setFontSize(9);
+  pdf.setFont('helvetica', 'bold');
+  pdf.setTextColor(15, 23, 42);
+  pdf.text(`TOTAL ORDERS: ${totalCount}  |  DELIVERED/COMPLETED: ${completedCount}  |  ACTIVE/SHIPPING: ${activeCount}  |  CANCELLED: ${cancelledCount}  |  REVENUE: ${formatCurrency(totalRevenue)}`, 14, 34);
+
+  // Table Data
+  const tableRows = orders.map((order, idx) => {
+    const exactDate = order.created_at 
+      ? format(new Date(order.created_at), 'dd MMM yyyy, hh:mm a')
+      : 'N/A';
+    
+    const itemsSummary = order.items && order.items.length > 0
+      ? order.items.map(i => `${i.name} (x${i.quantity || 1})`).join(', ')
+      : `${order.product_name || 'Generic Product'} (x${order.quantity || 1})`;
+
+    const grandTotal = (
+      (order.items && order.items.length > 0
+        ? order.items.reduce((sum: number, item: any) => sum + (Number(item.price) * (Number(item.quantity) || 1)), 0)
+        : (Number(order.price) || 0) * (Number(order.quantity) || 1)) + (Number(order.delivery_charge) || 120)
+    );
+
+    const sellerInfo = `${order.seller || 'pbazar'}${order.seller_id ? ` (ID: ${order.seller_id})` : ''}`;
+
+    let statusDisplay = (order.status || 'pending').toUpperCase();
+    if (order.status === 'cancelled' && order.cancelled_by) {
+      statusDisplay += ` (${order.cancelled_by.toUpperCase()})`;
+    }
+
+    return [
+      idx + 1,
+      order.id.slice(0, 8).toUpperCase(),
+      exactDate,
+      `${order.customer_name}\n${order.whatsapp_number}\n${order.location || ''}`,
+      itemsSummary,
+      sellerInfo,
+      `BDT ${grandTotal.toLocaleString()}`,
+      statusDisplay
+    ];
+  });
+
+  autoTable(pdf, {
+    head: [['SL', 'ORDER ID', 'DATE & EXACT TIME', 'CUSTOMER / LOCATION', 'PRODUCT(S) & QTY', 'SELLER / SHOP', 'TOTAL', 'STATUS']],
+    body: tableRows,
+    startY: 38,
+    styles: {
+      fontSize: 8,
+      cellPadding: 2.5,
+      valign: 'middle'
+    },
+    headStyles: {
+      fillColor: [30, 94, 243], // pbazar brand blue
+      textColor: 255,
+      fontStyle: 'bold'
+    },
+    alternateRowStyles: {
+      fillColor: [248, 250, 252]
+    },
+    columnStyles: {
+      0: { cellWidth: 10 },
+      1: { cellWidth: 20 },
+      2: { cellWidth: 35 },
+      3: { cellWidth: 50 },
+      4: { cellWidth: 55 },
+      5: { cellWidth: 35 },
+      6: { cellWidth: 25, halign: 'right' },
+      7: { cellWidth: 35 }
+    }
+  });
+
+  pdf.save(`pbazar_order_records_${format(new Date(), 'yyyy-MM-dd_HH-mm')}.pdf`);
+};

@@ -20,7 +20,22 @@ async function startServer() {
     next();
   });
 
-  app.use(express.json());
+  app.use(express.json({ limit: "50mb" }));
+  app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
+  // Ensure directories exist for hosting records and uploads
+  const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+
+  const hostDataDir = path.join(process.cwd(), 'host_data');
+  if (!fs.existsSync(hostDataDir)) {
+    fs.mkdirSync(hostDataDir, { recursive: true });
+  }
+
+  // Serve uploaded images statically
+  app.use('/uploads', express.static(uploadsDir));
 
   // Load Firebase Config for server-side endpoints
   let firebaseAppletConfig: any = {};
@@ -233,6 +248,170 @@ async function startServer() {
       res.json({ success: true, id: docRef.id });
     } catch (err: any) {
       res.status(500).json({ error: err.message || String(err) });
+    }
+  });
+
+  // --- IMAGE UPLOAD TO HOST SERVER (Instant Image to URL Converter) ---
+  app.post("/api/upload", (req, res) => {
+    try {
+      const { image, filename = "image.png" } = req.body;
+      if (!image) {
+        return res.status(400).json({ error: "No image payload provided" });
+      }
+
+      // Handle data URL (data:image/png;base64,...)
+      const matches = image.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+      let buffer: Buffer;
+      let ext = "png";
+
+      if (matches && matches.length === 3) {
+        const mime = matches[1];
+        if (mime.includes("jpeg") || mime.includes("jpg")) ext = "jpg";
+        else if (mime.includes("webp")) ext = "webp";
+        else if (mime.includes("gif")) ext = "gif";
+        buffer = Buffer.from(matches[2], "base64");
+      } else {
+        buffer = Buffer.from(image, "base64");
+      }
+
+      const safeName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
+      const filePath = path.join(uploadsDir, safeName);
+      fs.writeFileSync(filePath, buffer);
+
+      const host = req.get("host") || "localhost:3000";
+      const protocol = req.protocol || "http";
+      const publicUrl = `${protocol}://${host}/uploads/${safeName}`;
+
+      res.json({
+        success: true,
+        url: publicUrl,
+        relativePath: `/uploads/${safeName}`,
+        filename: safeName,
+        size: buffer.length
+      });
+    } catch (err: any) {
+      console.error("Upload error:", err);
+      res.status(500).json({ error: err.message || "Failed to save image" });
+    }
+  });
+
+  // --- HOST SERVER RECORDS STORAGE (Order Records Backup) ---
+  const orderRecordsFile = path.join(hostDataDir, "order_records.json");
+  const readRecords = (filePath: string) => {
+    try {
+      if (fs.existsSync(filePath)) {
+        return JSON.parse(fs.readFileSync(filePath, "utf-8"));
+      }
+    } catch (e) {
+      console.error("Error reading file:", filePath, e);
+    }
+    return [];
+  };
+
+  const writeRecords = (filePath: string, data: any) => {
+    try {
+      fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
+      return true;
+    } catch (e) {
+      console.error("Error writing file:", filePath, e);
+      return false;
+    }
+  };
+
+  app.get("/api/order_records", (req, res) => {
+    const records = readRecords(orderRecordsFile);
+    res.json({ records });
+  });
+
+  app.post("/api/order_records", (req, res) => {
+    try {
+      const newRecord = req.body;
+      const records = readRecords(orderRecordsFile);
+      const existingIndex = records.findIndex((r: any) => r.id === newRecord.id);
+      if (existingIndex >= 0) {
+        records[existingIndex] = { ...records[existingIndex], ...newRecord, updated_at: new Date().toISOString() };
+      } else {
+        records.unshift({
+          ...newRecord,
+          id: newRecord.id || `REC-${Date.now()}`,
+          recorded_at: new Date().toISOString()
+        });
+      }
+      writeRecords(orderRecordsFile, records.slice(0, 5000));
+      res.json({ success: true, count: records.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // --- CUSTOMER PRODUCT CLICK ACTIVITY (Deduplicated tracking) ---
+  const clicksFile = path.join(hostDataDir, "product_clicks.json");
+  app.get("/api/product_clicks", (req, res) => {
+    const clicks = readRecords(clicksFile);
+    res.json({ clicks });
+  });
+
+  app.post("/api/product_clicks", (req, res) => {
+    try {
+      const { customer_id, customer_name, customer_phone, product_id, product_name, product_image, ip_address } = req.body;
+      if (!product_id) {
+        return res.status(400).json({ error: "Product ID required" });
+      }
+
+      const clientIp = ip_address || req.headers["x-forwarded-for"] || req.socket.remoteAddress || "127.0.0.1";
+      const clicks = readRecords(clicksFile);
+
+      // Deduplication rule: Same customer/IP + Same product updates last_clicked_at & increments click_count without spamming duplicate rows
+      const targetUser = customer_id || customer_phone || clientIp;
+      const matchIndex = clicks.findIndex((c: any) => (c.customer_id === targetUser || c.ip_address === clientIp) && c.product_id === product_id);
+
+      if (matchIndex >= 0) {
+        clicks[matchIndex].click_count = (clicks[matchIndex].click_count || 1) + 1;
+        clicks[matchIndex].last_clicked_at = new Date().toISOString();
+        if (customer_name && !clicks[matchIndex].customer_name) clicks[matchIndex].customer_name = customer_name;
+      } else {
+        clicks.unshift({
+          id: `CLK-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          customer_id: targetUser,
+          customer_name: customer_name || "Guest Customer",
+          customer_phone: customer_phone || "",
+          product_id,
+          product_name: product_name || "Product",
+          product_image: product_image || "",
+          ip_address: String(clientIp),
+          click_count: 1,
+          first_clicked_at: new Date().toISOString(),
+          last_clicked_at: new Date().toISOString()
+        });
+      }
+
+      writeRecords(clicksFile, clicks.slice(0, 10000));
+      res.json({ success: true, count: clicks.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // --- SCAM LOGS & FRAUD PREVENTION AUDIT ---
+  const scamLogsFile = path.join(hostDataDir, "scam_logs.json");
+  app.get("/api/scam_logs", (req, res) => {
+    const logs = readRecords(scamLogsFile);
+    res.json({ logs });
+  });
+
+  app.post("/api/scam_logs", (req, res) => {
+    try {
+      const entry = req.body;
+      const logs = readRecords(scamLogsFile);
+      logs.unshift({
+        id: `SCAM-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        ...entry,
+        logged_at: new Date().toISOString()
+      });
+      writeRecords(scamLogsFile, logs.slice(0, 2000));
+      res.json({ success: true, count: logs.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
     }
   });
 
