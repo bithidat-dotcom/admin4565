@@ -39,9 +39,11 @@ export default function Sidebar({ currentView, onViewChange, isOpen = false, onC
     { id: 'scam_catcher', icon: ShieldAlert, label: '🛡️ Anti-Scam Shield', allowedRoles: ['admin', 'product_seller'], badge: 'SAFE' },
     { id: 'policies', icon: FileText, label: 'Terms & Policies', allowedRoles: ['admin', 'product_seller'] },
     { id: 'sellers', icon: Store, label: 'Sellers Hub', allowedRoles: ['admin'] },
+    { id: 'customers', icon: Users, label: 'Customer Intelligence', allowedRoles: ['admin', 'product_seller', 'customer'] },
     { id: 'offers', icon: Tag, label: 'Coupons & Banners', allowedRoles: ['admin'] },
     { id: 'analytics', icon: BarChart3, label: 'Analytics', allowedRoles: ['admin'] },
     { id: 'notifications', icon: Bell, label: 'Notifications', allowedRoles: ['admin', 'product_seller'] },
+    { id: 'profile', icon: Users, label: 'My Customer Account', allowedRoles: ['customer'] },
   ];
 
   const menuItems = allMenuItems.filter(item => !userSession || item.allowedRoles.includes(userSession.role));
