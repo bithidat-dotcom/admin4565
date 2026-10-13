@@ -31,19 +31,17 @@ export default function Sidebar({ currentView, onViewChange, isOpen = false, onC
 
   const allMenuItems: MenuItem[] = [
     { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard', allowedRoles: ['admin', 'product_seller'] },
-    { id: 'orders', icon: ShoppingCart, label: 'Product Orders', allowedRoles: ['admin', 'product_seller', 'customer'] },
+    { id: 'orders', icon: ShoppingCart, label: 'Product Orders', allowedRoles: ['admin', 'product_seller'] },
     { id: 'records', icon: FileSpreadsheet, label: 'Order Records (PDF/Excel)', allowedRoles: ['admin', 'product_seller'], badge: 'PRO' },
-    { id: 'products', icon: ShoppingBag, label: 'Products', allowedRoles: ['admin', 'product_seller', 'customer'] },
+    { id: 'products', icon: ShoppingBag, label: 'Products', allowedRoles: ['admin', 'product_seller'] },
     { id: 'seo', icon: Search, label: 'Product SEO & Growth', allowedRoles: ['admin', 'product_seller'], badge: 'NEW' },
     { id: 'inventory', icon: Warehouse, label: 'Inventory (Stock)', allowedRoles: ['admin', 'product_seller'] },
     { id: 'scam_catcher', icon: ShieldAlert, label: '🛡️ Anti-Scam Shield', allowedRoles: ['admin', 'product_seller'], badge: 'SAFE' },
     { id: 'policies', icon: FileText, label: 'Terms & Policies', allowedRoles: ['admin', 'product_seller'] },
     { id: 'sellers', icon: Store, label: 'Sellers Hub', allowedRoles: ['admin'] },
-    { id: 'customers', icon: Users, label: 'Customer Intelligence', allowedRoles: ['admin', 'product_seller'] },
     { id: 'offers', icon: Tag, label: 'Coupons & Banners', allowedRoles: ['admin'] },
     { id: 'analytics', icon: BarChart3, label: 'Analytics', allowedRoles: ['admin'] },
     { id: 'notifications', icon: Bell, label: 'Notifications', allowedRoles: ['admin', 'product_seller'] },
-    { id: 'profile', icon: Users, label: 'My Customer Account', allowedRoles: ['customer'] },
   ];
 
   const menuItems = allMenuItems.filter(item => !userSession || item.allowedRoles.includes(userSession.role));
@@ -157,7 +155,7 @@ export default function Sidebar({ currentView, onViewChange, isOpen = false, onC
         <div className="p-3 border-t border-white/10 bg-black/10">
           <button
             type="button"
-            onClick={() => onViewChange('profile')}
+            onClick={() => onViewChange('dashboard')}
             className="w-full flex items-center gap-2.5 p-2 bg-white/5 rounded-xl border border-white/10 hover:bg-white/15 transition-all text-left"
           >
             <div className="w-8 h-8 rounded-lg bg-white text-[#1E5EF3] flex items-center justify-center font-black text-xs shrink-0 shadow-sm">

@@ -10,10 +10,8 @@ import SellersPage from './components/SellersPage';
 import SettingsPage from './components/SettingsPage';
 import InventoryPage from './components/InventoryPage';
 import OffersPage from './components/OffersPage';
-import CustomersPage from './components/CustomersPage';
 import NotificationsPage from './components/NotificationsPage';
 import LoginPage from './components/LoginPage';
-import ProfilePage from './components/ProfilePage';
 import LinkConverterModal from './components/LinkConverterModal';
 import PopupAd from './components/PopupAd';
 import MobileNav from './components/MobileNav';
@@ -32,7 +30,7 @@ import { collection, onSnapshot, query, where, getDocs, updateDoc, doc, limit, o
 import { cn } from './lib/utils';
 
 export interface UserSession {
-  role: 'admin' | 'product_seller' | 'food_seller' | 'seller' | 'customer';
+  role: 'admin' | 'product_seller' | 'food_seller' | 'seller';
   name?: string;
   sellerId?: string;
   phone?: string;
@@ -257,7 +255,7 @@ export default function App() {
     }
 
     if (userSession.role === 'product_seller') {
-        const allowed = ['dashboard', 'products', 'orders', 'records', 'seo', 'inventory', 'scam_catcher', 'policies', 'notifications', 'profile', 'customers'];
+        const allowed = ['dashboard', 'products', 'orders', 'records', 'seo', 'inventory', 'scam_catcher', 'policies', 'notifications'];
         if (!allowed.includes(currentView)) return <ProductsPage defaultCategory={filterCategory} onViewChange={setCurrentView} userSession={userSession} />;
     }
 
@@ -280,10 +278,6 @@ export default function App() {
         return <InventoryPage />;
       case 'sellers':
         return <SellersPage userSession={userSession} />;
-      case 'customers':
-        return <CustomersPage userSession={userSession} />;
-      case 'profile':
-        return <ProfilePage userSession={userSession} />;
       case 'offers':
         return <OffersPage />;
       case 'banners':

@@ -197,10 +197,8 @@ export type View =
   | 'inventory' 
   | 'offers' 
   | 'analytics' 
-  | 'customers' 
   | 'notifications' 
-  | 'monetization'
-  | 'profile';
+  | 'monetization';
 
 export interface InventoryItem {
   id: string;
