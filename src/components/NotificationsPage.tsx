@@ -19,35 +19,7 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Generate a set of realistic notifications for instant interaction
-    const demoNotifications: AppNotification[] = [
-      {
-        id: '1',
-        title: 'New Restaurant Order Received',
-        body: 'Zayn Malik placed a new order #FB940A for "Crispy Double Chicken Burger".',
-        type: 'order',
-        created_at: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
-        is_read: false
-      },
-      {
-        id: '2',
-        title: 'Stock Warning threshold breached',
-        body: 'Product "Premium Leather Smart Wallet" stock is down to 2 units.',
-        type: 'stock',
-        created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-        is_read: false
-      },
-      {
-        id: '3',
-        title: 'System Backup Success',
-        body: 'All Firestore document tables and assets backed up securely to persistent container mirrors.',
-        type: 'system',
-        created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-        is_read: true
-      }
-    ];
-
-    setNotifications(demoNotifications);
+    setNotifications([]);
     setLoading(false);
   }, []);
 

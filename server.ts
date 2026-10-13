@@ -3,7 +3,7 @@ import path from "path";
 import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, getDocs, addDoc, doc, deleteDoc, updateDoc } from "firebase/firestore";
+import { getFirestore, collection, getDocs, addDoc, doc, deleteDoc, updateDoc, setDoc } from "firebase/firestore";
 
 async function startServer() {
   const app = express();
@@ -193,6 +193,23 @@ async function startServer() {
   app.post("/api/orders", async (req, res) => {
     try {
       const orderPayload = req.body;
+      const phone = orderPayload.whatsapp_number || orderPayload.phone || orderPayload.customer_phone;
+      const customerId = orderPayload.customer_id;
+
+      // Check if user is blocked from ordering on server
+      const usersList = readRecords(path.join(hostDataDir, "users.json"));
+      const blockedUser = usersList.find((u: any) => 
+        (phone && u.whatsapp_number && u.whatsapp_number.replace(/\D/g, '') === String(phone).replace(/\D/g, '')) ||
+        (customerId && u.id === customerId)
+      );
+
+      if (blockedUser && blockedUser.is_order_blocked) {
+        return res.status(403).json({ 
+          error: "Order blocked: This customer account is currently suspended from placing orders by Admin policy.",
+          is_order_blocked: true 
+        });
+      }
+
       const docRef = await addDoc(collection(db, "orders"), {
         ...orderPayload,
         created_at: new Date().toISOString()
@@ -412,6 +429,172 @@ async function startServer() {
       res.json({ success: true, count: logs.length });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
+    }
+  });
+
+  // --- CUSTOMER & USER MANAGEMENT (Host Server System) ---
+  const usersFile = path.join(hostDataDir, "users.json");
+
+  // Get all users
+  app.get("/api/users", (req, res) => {
+    const users = readRecords(usersFile);
+    res.json({ users });
+  });
+
+  // User Login & Registration on Server
+  app.post("/api/users/login", async (req, res) => {
+    try {
+      const { id, name, whatsapp_number, phone, image, location, ip_address } = req.body;
+      const clientIp = ip_address || req.headers["x-forwarded-for"] || req.socket.remoteAddress || "127.0.0.1";
+      const cleanPhone = (whatsapp_number || phone || "").trim();
+      const users = readRecords(usersFile);
+
+      // Check if user exists by phone or ID
+      const userIndex = users.findIndex((u: any) => 
+        (cleanPhone && u.whatsapp_number && u.whatsapp_number.replace(/\D/g, '') === cleanPhone.replace(/\D/g, '')) ||
+        (id && u.id === id)
+      );
+
+      let savedUser: any;
+      const now = new Date().toISOString();
+
+      if (userIndex >= 0) {
+        // Update existing user login details
+        users[userIndex] = {
+          ...users[userIndex],
+          name: name || users[userIndex].name,
+          image: image || users[userIndex].image || "",
+          location: location || users[userIndex].location || "Dhaka, Bangladesh",
+          ip_address: String(clientIp),
+          last_login: now,
+          updated_at: now
+        };
+        savedUser = users[userIndex];
+      } else {
+        // Create new customer record
+        savedUser = {
+          id: id || `USER-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          name: name || "Customer",
+          whatsapp_number: cleanPhone,
+          image: image || "",
+          location: location || "Dhaka, Bangladesh",
+          ip_address: String(clientIp),
+          is_order_blocked: false,
+          total_orders: 0,
+          total_spent: 0,
+          created_at: now,
+          last_login: now,
+          status: "active"
+        };
+        users.unshift(savedUser);
+      }
+
+      writeRecords(usersFile, users.slice(0, 10000));
+
+      // Sync with Firestore users collection if available
+      try {
+        if (savedUser.id) {
+          const userDocRef = doc(db, "users", savedUser.id);
+          await setDoc(userDocRef, savedUser, { merge: true });
+        }
+      } catch (fbErr) {
+        console.warn("Firestore sync warning on user login:", fbErr);
+      }
+
+      res.json({ success: true, user: savedUser });
+    } catch (err: any) {
+      console.error("User login error:", err);
+      res.status(500).json({ error: err.message || "Failed to process user login" });
+    }
+  });
+
+  // Create or Update user directly
+  app.post("/api/users", async (req, res) => {
+    try {
+      const userData = req.body;
+      const users = readRecords(usersFile);
+      const existingIdx = users.findIndex((u: any) => u.id === userData.id);
+
+      if (existingIdx >= 0) {
+        users[existingIdx] = { ...users[existingIdx], ...userData, updated_at: new Date().toISOString() };
+      } else {
+        users.unshift({
+          id: userData.id || `USER-${Date.now()}`,
+          is_order_blocked: false,
+          created_at: new Date().toISOString(),
+          last_login: new Date().toISOString(),
+          ...userData
+        });
+      }
+
+      writeRecords(usersFile, users.slice(0, 10000));
+      res.json({ success: true, count: users.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Admin: Delete User Account
+  app.delete("/api/users/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const users = readRecords(usersFile);
+      const filtered = users.filter((u: any) => u.id !== id && u.whatsapp_number !== id);
+      writeRecords(usersFile, filtered);
+
+      // Attempt deletion in Firestore
+      try {
+        await deleteDoc(doc(db, "users", id));
+      } catch (fbErr) {
+        console.warn("Firestore user delete warning:", fbErr);
+      }
+
+      res.json({ success: true, message: "User account deleted successfully" });
+    } catch (err: any) {
+      console.error("Error deleting user:", err);
+      res.status(500).json({ error: err.message || "Failed to delete user" });
+    }
+  });
+
+  // Admin: Stop / Allow User Orders (Toggle or Set)
+  app.post("/api/users/:id/toggle_order_block", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { is_order_blocked, reason } = req.body;
+      const users = readRecords(usersFile);
+      const targetUser = users.find((u: any) => u.id === id || u.whatsapp_number === id);
+
+      if (!targetUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const newBlockedState = typeof is_order_blocked === "boolean" ? is_order_blocked : !targetUser.is_order_blocked;
+      targetUser.is_order_blocked = newBlockedState;
+      targetUser.order_blocked_reason = newBlockedState ? (reason || "Blocked by Admin") : "";
+      targetUser.order_blocked_at = newBlockedState ? new Date().toISOString() : "";
+      targetUser.status = newBlockedState ? "blocked" : "active";
+
+      writeRecords(usersFile, users);
+
+      // Sync block status to Firestore
+      try {
+        await updateDoc(doc(db, "users", targetUser.id), {
+          is_order_blocked: newBlockedState,
+          order_blocked_reason: targetUser.order_blocked_reason,
+          status: targetUser.status
+        });
+      } catch (fbErr) {
+        console.warn("Firestore sync error for user order block:", fbErr);
+      }
+
+      res.json({ 
+        success: true, 
+        is_order_blocked: newBlockedState,
+        message: newBlockedState ? "Orders stopped for this user" : "Orders permitted for this user" 
+      });
+    } catch (err: any) {
+      console.error("Error updating user order block status:", err);
+      res.status(500).json({ error: err.message || "Failed to toggle order status" });
     }
   });
 

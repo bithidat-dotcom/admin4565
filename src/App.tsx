@@ -22,6 +22,7 @@ import ProductSeoPage from './components/ProductSeoPage';
 import ScamCatcherPage from './components/ScamCatcherPage';
 import SellerPoliciesModal from './components/SellerPoliciesModal';
 import AnalyticsPage from './components/AnalyticsPage';
+import MonetizationPage from './components/MonetizationPage';
 import { View } from './types';
 import { motion, AnimatePresence } from 'motion/react';
 import { db, handleFirestoreError, OperationType, isQuotaExceeded } from './lib/firebase';
@@ -31,9 +32,12 @@ import { collection, onSnapshot, query, where, getDocs, updateDoc, doc, limit, o
 import { cn } from './lib/utils';
 
 export interface UserSession {
-  role: 'admin' | 'product_seller' | 'food_seller' | 'seller';
+  role: 'admin' | 'product_seller' | 'food_seller' | 'seller' | 'customer';
   name?: string;
   sellerId?: string;
+  phone?: string;
+  image?: string;
+  userId?: string;
 }
 
 export default function App() {                
@@ -247,6 +251,11 @@ export default function App() {
     if (!userSession) return <Dashboard onViewChange={setCurrentView} />;
     
     // Strict Role-Based Access Control
+    if (userSession.role === 'customer') {
+        const allowed = ['products', 'orders', 'profile'];
+        if (!allowed.includes(currentView)) return <ProductsPage defaultCategory={filterCategory} onViewChange={setCurrentView} userSession={userSession} />;
+    }
+
     if (userSession.role === 'product_seller') {
         const allowed = ['dashboard', 'products', 'orders', 'records', 'seo', 'inventory', 'scam_catcher', 'policies', 'notifications', 'profile', 'customers'];
         if (!allowed.includes(currentView)) return <ProductsPage defaultCategory={filterCategory} onViewChange={setCurrentView} userSession={userSession} />;
@@ -285,6 +294,8 @@ export default function App() {
         return <NotificationsPage />;
       case 'reviews':
         return <ReviewsPage />;
+      case 'monetization':
+        return <MonetizationPage />;
       case 'settings':
         return <SettingsPage />;
       default:

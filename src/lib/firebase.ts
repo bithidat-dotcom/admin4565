@@ -49,6 +49,19 @@ export interface FirestoreErrorInfo {
 }
 
 export function handleFirestoreError(error: any, operationType: OperationType, path: string | null) {
+  // Handle normal idle stream disconnections gracefully (code 1 / CANCELLED: Disconnecting idle stream)
+  const isIdleStreamCancellation = 
+    error?.code === 1 || 
+    error?.code === '1' || 
+    error?.code === 'cancelled' ||
+    error?.message?.includes('Disconnecting idle stream') ||
+    error?.message?.includes('CANCELLED');
+
+  if (isIdleStreamCancellation) {
+    console.debug('Firestore idle stream disconnected (normal idle timeout). Reconnection will happen automatically.');
+    return;
+  }
+
   const isQuotaError = error?.code === 'resource-exhausted' || 
                        error?.message?.includes('Quota limit exceeded') ||
                        (typeof error === 'string' && error.includes('Quota limit exceeded')) ||

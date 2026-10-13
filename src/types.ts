@@ -39,6 +39,7 @@ export interface Product {
   seo_score?: number;
   clicks?: number;
   views?: number;
+  favorites_count?: number;
   rank_order?: number;
   is_demoted?: boolean;
 }
@@ -121,6 +122,10 @@ export interface User {
   created_at: string;
   ip_address?: string;
   image?: string;
+  is_order_blocked?: boolean;
+  order_blocked_reason?: string;
+  order_blocked_at?: string;
+  status?: 'active' | 'blocked';
 }
 
 export interface Seller {
@@ -142,6 +147,7 @@ export interface Seller {
   is_verified?: boolean;
   rating?: number;
   is_frozen?: boolean;
+  is_blocked?: boolean;
   cancellation_count?: number;
 }
 
@@ -193,6 +199,7 @@ export type View =
   | 'analytics' 
   | 'customers' 
   | 'notifications' 
+  | 'monetization'
   | 'profile';
 
 export interface InventoryItem {

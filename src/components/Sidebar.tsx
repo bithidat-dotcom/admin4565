@@ -3,7 +3,7 @@ import {
   LayoutDashboard, ShoppingBag, ShoppingCart, Users, X, 
   Link as LinkIcon, Store, LogOut, BarChart3, 
   Warehouse, Tag, Bell, ShieldAlert, FileSpreadsheet, Search, 
-  FileText, Sparkles 
+  FileText, Sparkles, DollarSign 
 } from 'lucide-react';
 import { View } from '../types';
 import { cn } from '../lib/utils';
@@ -31,9 +31,9 @@ export default function Sidebar({ currentView, onViewChange, isOpen = false, onC
 
   const allMenuItems: MenuItem[] = [
     { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard', allowedRoles: ['admin', 'product_seller'] },
-    { id: 'orders', icon: ShoppingCart, label: 'Product Orders', allowedRoles: ['admin', 'product_seller'] },
+    { id: 'orders', icon: ShoppingCart, label: 'Product Orders', allowedRoles: ['admin', 'product_seller', 'customer'] },
     { id: 'records', icon: FileSpreadsheet, label: 'Order Records (PDF/Excel)', allowedRoles: ['admin', 'product_seller'], badge: 'PRO' },
-    { id: 'products', icon: ShoppingBag, label: 'Products', allowedRoles: ['admin', 'product_seller'] },
+    { id: 'products', icon: ShoppingBag, label: 'Products', allowedRoles: ['admin', 'product_seller', 'customer'] },
     { id: 'seo', icon: Search, label: 'Product SEO & Growth', allowedRoles: ['admin', 'product_seller'], badge: 'NEW' },
     { id: 'inventory', icon: Warehouse, label: 'Inventory (Stock)', allowedRoles: ['admin', 'product_seller'] },
     { id: 'scam_catcher', icon: ShieldAlert, label: '🛡️ Anti-Scam Shield', allowedRoles: ['admin', 'product_seller'], badge: 'SAFE' },
@@ -43,6 +43,7 @@ export default function Sidebar({ currentView, onViewChange, isOpen = false, onC
     { id: 'offers', icon: Tag, label: 'Coupons & Banners', allowedRoles: ['admin'] },
     { id: 'analytics', icon: BarChart3, label: 'Analytics', allowedRoles: ['admin'] },
     { id: 'notifications', icon: Bell, label: 'Notifications', allowedRoles: ['admin', 'product_seller'] },
+    { id: 'profile', icon: Users, label: 'My Customer Account', allowedRoles: ['customer'] },
   ];
 
   const menuItems = allMenuItems.filter(item => !userSession || item.allowedRoles.includes(userSession.role));

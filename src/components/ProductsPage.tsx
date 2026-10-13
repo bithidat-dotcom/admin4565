@@ -5,7 +5,7 @@ import { Product, Seller } from '../types';
 import Header from '../components/Header';
 import Modal from '../components/Modal';
 import LoadingDots from './LoadingDots';
-import { exportToCSV } from '../lib/utils';
+import { exportToCSV, exportProductsToPDF } from '../lib/utils';
 import { 
   Edit2, 
   Trash2, 
@@ -685,6 +685,12 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
             >
                 Export CSV
             </button>
+            <button 
+                onClick={() => exportProductsToPDF(filteredProducts)}
+                className="bg-brand text-white rounded-lg px-4 py-3 sm:py-2 text-xs font-black uppercase tracking-widest hover:bg-brand-dark transition-colors shadow-md"
+            >
+                Export PDF Catalog
+            </button>
       </div>
 
       <main className="p-4 md:p-8 w-full">
@@ -848,7 +854,7 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
                   <h3 className="font-bold text-slate-900 line-clamp-1 text-sm uppercase">{product.name}</h3>
                   <div className="flex justify-between items-center mt-2">
                       <span className="font-black text-brand text-sm">{formatCurrency(product.price)}</span>
-                      <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded", (product.stock || 0) > 0 ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700")}>{(product.stock || 0)} left</span>
+                      <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded", (product.stock ?? product.quantity ?? product.qty ?? 20) > 0 ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700")}>{product.stock ?? product.quantity ?? product.qty ?? 20} left</span>
                   </div>
                   <p className="text-slate-500 text-xs mt-2 line-clamp-2 min-h-[32px] leading-relaxed">
                     {product.description}
@@ -909,20 +915,25 @@ export default function ProductsPage({ defaultCategory = 'All', onCategoryFilter
                   
                   {/* Stock Status & Units Sold indicators */}
                   <div className="mt-3 flex items-center justify-between gap-2">
-                    <span className={cn(
-                      "text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full",
-                      (product.stock ?? 0) === 0 
-                        ? "bg-red-50 text-red-600 border border-red-100" 
-                        : (product.stock ?? 0) <= 5 
-                          ? "bg-amber-50 text-amber-600 border border-amber-100" 
-                          : "bg-emerald-50 text-emerald-600 border border-emerald-100"
-                    )}>
-                      {(product.stock ?? 0) === 0 
-                        ? "Out Of Stock" 
-                        : (product.stock ?? 0) <= 5 
-                          ? `Low Stock: ${product.stock}` 
-                          : `In Stock: ${product.stock}`}
-                    </span>
+                    {(() => {
+                      const currentStock = Number(product.stock ?? product.quantity ?? product.qty ?? 20);
+                      return (
+                        <span className={cn(
+                          "text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full",
+                          currentStock === 0 
+                            ? "bg-red-50 text-red-600 border border-red-100" 
+                            : currentStock <= 5 
+                              ? "bg-amber-50 text-amber-600 border border-amber-100" 
+                              : "bg-emerald-50 text-emerald-600 border border-emerald-100"
+                        )}>
+                          {currentStock === 0 
+                            ? "Out Of Stock" 
+                            : currentStock <= 5 
+                              ? `Low Stock: ${currentStock}` 
+                              : `In Stock: ${currentStock}`}
+                        </span>
+                      );
+                    })()}
                     <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest bg-slate-100 border border-slate-200 px-2.5 py-0.5 rounded-full">
                       {product.sold ?? 0} Sold
                     </span>

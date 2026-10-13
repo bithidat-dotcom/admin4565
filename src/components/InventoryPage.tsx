@@ -89,14 +89,21 @@ export default function InventoryPage() {
     ...products.map(p => {
       const sellerKey = (p.seller_id || p.seller || '').toLowerCase();
       const matchedSeller = sellersMap[sellerKey];
+      const stockVal = p.stock !== undefined && p.stock !== null && !isNaN(Number(p.stock)) 
+        ? Number(p.stock) 
+        : (p.quantity !== undefined && p.quantity !== null && !isNaN(Number(p.quantity)) 
+            ? Number(p.quantity) 
+            : (p.qty !== undefined && p.qty !== null && !isNaN(Number(p.qty)) 
+                ? Number(p.qty) 
+                : 20));
       return {
         id: p.id,
         name: p.name,
         type: 'product' as const,
-        stock: Number(p.stock !== undefined ? p.stock : (p.quantity ?? p.qty ?? 0)),
+        stock: stockVal,
         minimum_stock: 5,
-        sold: p.sold || 0,
-        price: p.price,
+        sold: Number(p.sold || 0),
+        price: Number(p.price || 0),
         image: p.image || (p.images && p.images[0]) || '',
         seller_name: p.seller || matchedSeller?.name || 'pbazar Partner',
         seller_id: p.seller_id || '',
@@ -107,14 +114,17 @@ export default function InventoryPage() {
     ...foods.map(f => {
       const sellerKey = (f.seller_id || f.seller || '').toLowerCase();
       const matchedSeller = sellersMap[sellerKey];
+      const stockVal = f.stock !== undefined && f.stock !== null && !isNaN(Number(f.stock)) 
+        ? Number(f.stock) 
+        : 20;
       return {
         id: f.id,
         name: f.name,
         type: 'food' as const,
-        stock: Number(f.stock || 0),
+        stock: stockVal,
         minimum_stock: 10,
-        sold: f.sold_quantity || 0,
-        price: f.price,
+        sold: Number(f.sold_quantity || f.sold || 0),
+        price: Number(f.price || 0),
         image: f.image || '',
         seller_name: f.seller || matchedSeller?.name || 'Food Vendor',
         seller_id: f.seller_id || '',

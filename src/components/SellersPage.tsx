@@ -175,6 +175,22 @@ export default function SellersPage({ userSession }: SellersPageProps) {
     setIsModalOpen(true);
   };
 
+  const handleToggleBlockSeller = async (seller: Seller, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const newBlockedState = !seller.is_blocked;
+    const actionName = newBlockedState ? "block sales for" : "restore";
+    if (!confirm(`Are you sure you want to ${actionName} seller "${seller.name}"?`)) return;
+
+    try {
+      await updateDoc(doc(db, 'sellers', seller.id), {
+        is_blocked: newBlockedState,
+        updatedAt: serverTimestamp()
+      });
+    } catch (err: any) {
+      handleFirestoreError(err, OperationType.UPDATE, `sellers/${seller.id}`);
+    }
+  };
+
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!confirm('Are you sure you want to delete this seller?')) return;
@@ -434,19 +450,32 @@ export default function SellersPage({ userSession }: SellersPageProps) {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {filteredSellers.map((seller) => {
                   const m = getSellerMetrics(seller);
+                  const isGrowing = m.revenue >= 500 || m.totalSold >= 3;
                   return (
                     <div 
                       key={seller.id} 
                       onClick={() => setSelectedDashboardSeller(seller)}
-                      className="bg-white rounded-3xl border border-slate-200 p-6 flex flex-col items-center text-center group hover:shadow-md hover:border-slate-300 transition-all duration-300 relative overflow-hidden cursor-pointer"
+                      className={cn(
+                        "bg-white rounded-3xl border p-6 flex flex-col items-center text-center group hover:shadow-md transition-all duration-300 relative overflow-hidden cursor-pointer",
+                        seller.is_blocked ? "border-rose-300 bg-rose-50/20" : "border-slate-200 hover:border-slate-300"
+                      )}
                     >
-                      <div className="absolute top-4 left-4 flex items-center gap-1.5">
+                      <div className="absolute top-4 left-4 flex items-center gap-1.5 flex-wrap">
                         <span className="text-[8px] font-black uppercase bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded-full tracking-wider border border-indigo-100/40">
                           {seller.seller_id || 'PARTNER'}
                         </span>
+                        {seller.is_blocked ? (
+                          <span className="text-[8px] font-black uppercase bg-rose-100 text-rose-700 px-2.5 py-1 rounded-full tracking-wider">
+                            🚫 Blocked
+                          </span>
+                        ) : isGrowing ? (
+                          <span className="text-[8px] font-black uppercase bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-full tracking-wider flex items-center gap-0.5">
+                            <TrendingUp className="w-2.5 h-2.5" /> Growing
+                          </span>
+                        ) : null}
                       </div>
 
-                      <div className="w-20 h-20 rounded-full bg-slate-50 border-4 border-white shadow-md flex items-center justify-center mt-3 mb-4 overflow-hidden relative">
+                      <div className="w-20 h-20 rounded-full bg-slate-50 border-4 border-white shadow-md flex items-center justify-center mt-6 mb-4 overflow-hidden relative">
                         {seller.logo ? (
                           <img src={seller.logo} alt={seller.name} className="w-full h-full object-cover" />
                         ) : (
@@ -460,24 +489,42 @@ export default function SellersPage({ userSession }: SellersPageProps) {
                       <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">
                         <Phone className="w-3 h-3 inline mr-1" />{seller.whatsapp_number}
                       </p>
-                      <p className="text-[10px] text-indigo-600 font-black uppercase tracking-widest mb-4">
-                        25% Commission: {formatCurrency(m.commissions)}
+                      <p className="text-[10px] text-indigo-600 font-black uppercase tracking-widest mb-3">
+                        Revenue: {formatCurrency(m.revenue)}
                       </p>
                       
                       {m.bestProduct && (
-                        <div className="w-full bg-slate-50 rounded-xl p-3 mb-4">
-                            <p className="text-[8px] font-black text-slate-400 uppercase tracking-wider">Best Product</p>
+                        <div className="w-full bg-slate-50 rounded-xl p-3 mb-3">
+                            <p className="text-[8px] font-black text-slate-400 uppercase tracking-wider">Top Performing Product</p>
                             <p className="text-xs font-bold text-slate-800 mt-0.5 truncate">{m.bestProduct.name}</p>
                         </div>
                       )}
 
-                      <div className="flex items-center justify-between w-full mt-auto pt-3 border-t border-slate-100 gap-2.5">
+                      <div className="flex items-center justify-between w-full mt-auto pt-3 border-t border-slate-100 gap-2">
                         <button 
                           onClick={() => setSelectedDashboardSeller(seller)}
-                          className="flex-1 py-2 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all hover:bg-indigo-700 cursor-pointer flex items-center justify-center gap-1.5"
+                          className="flex-1 py-2 bg-indigo-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest transition-all hover:bg-indigo-700 cursor-pointer flex items-center justify-center gap-1"
                         >
-                          <LayoutDashboard className="w-3.5 h-3.5" />
-                          View Dashboard
+                          <LayoutDashboard className="w-3 h-3" />
+                          KPIs & SEO
+                        </button>
+                        <button 
+                          onClick={(e) => handleToggleBlockSeller(seller, e)}
+                          className={cn(
+                            "p-2 rounded-xl border text-[9px] font-black uppercase tracking-wider transition-all",
+                            seller.is_blocked ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100" : "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+                          )}
+                          title={seller.is_blocked ? "Restore Seller Sales" : "Block Seller Sales"}
+                        >
+                          {seller.is_blocked ? "Restore" : "Block"}
+                        </button>
+                        <button 
+                          onClick={(e) => handleDelete(seller.id, e)}
+                          disabled={deletingId === seller.id}
+                          className="p-2 bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 rounded-xl"
+                          title="Remove Seller"
+                        >
+                          {deletingId === seller.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
                         </button>
                       </div>
                     </div>
@@ -490,26 +537,30 @@ export default function SellersPage({ userSession }: SellersPageProps) {
             {viewMode === 'table' && (
               <div className="bg-white rounded-3xl border border-slate-205/60 overflow-hidden shadow-sm">
                 <div className="overflow-x-auto w-full">
-                  <table className="w-full text-left border-collapse table-auto min-w-[900px]">
+                  <table className="w-full text-left border-collapse table-auto min-w-[1000px]">
                     <thead>
                       <tr className="bg-slate-50 border-b border-slate-200/50">
-                        <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Seller Name / Id</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Seller / Growth Status</th>
                         <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Contact Number</th>
                         <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Active Products</th>
                         <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Realized Revenue</th>
                         <th className="px-6 py-4 text-[10px] font-black text-slate-550 uppercase tracking-widest text-[#6366f1]">25% Commission</th>
-                        <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Best Product</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Growth & SEO</th>
                         <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {filteredSellers.map((seller) => {
                         const m = getSellerMetrics(seller);
+                        const isGrowing = m.revenue >= 500 || m.totalSold >= 3;
                         return (
                           <tr 
                             key={seller.id} 
                             onClick={() => setSelectedDashboardSeller(seller)}
-                            className="group hover:bg-indigo-50/20 transition-all cursor-pointer"
+                            className={cn(
+                              "group transition-all cursor-pointer",
+                              seller.is_blocked ? "bg-rose-50/30 hover:bg-rose-50/50" : "hover:bg-indigo-50/20"
+                            )}
                           >
                             <td className="px-6 py-4.5 flex items-center gap-3">
                               <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200/60 flex items-center justify-center overflow-hidden flex-shrink-0">
@@ -520,10 +571,13 @@ export default function SellersPage({ userSession }: SellersPageProps) {
                                 )}
                               </div>
                               <div>
-                                <div className="text-xs font-black text-slate-800 uppercase tracking-tight flex items-center gap-1">
+                                <div className="text-xs font-black text-slate-800 uppercase tracking-tight flex items-center gap-1.5">
                                   <span>{seller.name}</span>
                                   {seller.is_verified && (
                                     <ShieldCheck className="w-3.5 h-3.5 fill-blue-500 text-white flex-shrink-0" title="pbazar Verified Merchant" />
+                                  )}
+                                  {seller.is_blocked && (
+                                    <span className="text-[8px] bg-rose-100 text-rose-700 font-black px-2 py-0.5 rounded uppercase">Blocked</span>
                                   )}
                                 </div>
                                 <div className="text-[9px] text-slate-400 font-bold uppercase mt-0.5">{seller.seller_id || seller.id.slice(0, 8)}</div>
@@ -540,8 +594,16 @@ export default function SellersPage({ userSession }: SellersPageProps) {
                             </td>
                             <td className="px-6 py-4 text-xs font-black text-slate-800">{formatCurrency(m.revenue)}</td>
                             <td className="px-6 py-4 text-xs font-black text-[#6366f1]">{formatCurrency(m.commissions)}</td>
-                            <td className="px-6 py-4 text-xs font-bold text-slate-700 max-w-[155px] truncate">
-                              {m.bestProduct ? m.bestProduct.name : <span className="text-slate-400">N/A</span>}
+                            <td className="px-6 py-4 text-xs font-bold text-slate-700">
+                              {isGrowing ? (
+                                <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center gap-1 w-max">
+                                  <TrendingUp className="w-3 h-3" /> Growing Fast (SEO 98%)
+                                </span>
+                              ) : (
+                                <span className="px-2.5 py-1 bg-slate-100 text-slate-600 border border-slate-200 rounded-lg text-[9px] font-black uppercase tracking-wider">
+                                  Stable (SEO 85%)
+                                </span>
+                              )}
                             </td>
                             <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                               <div className="inline-flex items-center gap-1.5">
@@ -549,18 +611,29 @@ export default function SellersPage({ userSession }: SellersPageProps) {
                                   onClick={() => setSelectedDashboardSeller(seller)}
                                   className="px-2.5 py-1.5 bg-indigo-50 border border-indigo-100/50 hover:bg-indigo-600 hover:text-white rounded-lg text-[9px] font-black uppercase text-indigo-700 transition-colors"
                                 >
-                                  KPI metrics
+                                  KPIs
+                                </button>
+                                <button 
+                                  onClick={(e) => handleToggleBlockSeller(seller, e)}
+                                  className={cn(
+                                    "px-2.5 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all border",
+                                    seller.is_blocked ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100" : "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+                                  )}
+                                >
+                                  {seller.is_blocked ? "Restore" : "Block"}
                                 </button>
                                 <button 
                                   onClick={(e) => handleEdit(seller, e)}
-                                  className="p-1 px-2 border border-slate-200 hover:bg-slate-100 rounded-lg text-slate-500"
+                                  className="p-1.5 border border-slate-200 hover:bg-slate-100 rounded-lg text-slate-500"
+                                  title="Edit"
                                 >
                                   <Edit2 className="w-3 h-3" />
                                 </button>
                                 <button 
                                   onClick={(e) => handleDelete(seller.id, e)}
                                   disabled={deletingId === seller.id}
-                                  className="p-1 px-2 border border-rose-100 hover:bg-rose-100 text-rose-600 rounded-lg"
+                                  className="p-1.5 border border-rose-100 hover:bg-rose-100 text-rose-600 rounded-lg"
+                                  title="Remove Seller"
                                 >
                                   {deletingId === seller.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
                                 </button>
