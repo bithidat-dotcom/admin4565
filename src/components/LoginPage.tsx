@@ -123,25 +123,25 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4 relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4 sm:p-6 relative overflow-y-auto">
       {/* Abstract Background Decoration */}
       <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-brand to-indigo-600" />
       <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-brand/5 rounded-full blur-[120px]" />
       <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-500/5 rounded-full blur-[120px]" />
 
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md border border-slate-100 relative z-10 flex flex-col">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md border border-slate-100 relative z-10 flex flex-col my-auto">
         
         {/* Logo & Header */}
-        <div className="p-8 pb-4 text-center">
-            <div className="w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl shadow-slate-200">
-                <Store className="w-8 h-8 text-brand" />
+        <div className="p-6 sm:p-8 pb-3 sm:pb-4 text-center">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 bg-slate-900 rounded-2xl flex items-center justify-center mx-auto mb-3 sm:mb-4 shadow-xl shadow-slate-200">
+                <Store className="w-7 h-7 sm:w-8 sm:h-8 text-brand" />
             </div>
-            <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tight">pbazar Partner Hub</h1>
-            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Version 3.0 • Secure Access</p>
+            <h1 className="text-xl sm:text-2xl font-black text-slate-900 uppercase tracking-tight">pbazar Partner Hub</h1>
+            <p className="text-[10px] sm:text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Mobile & Web Access v3.0</p>
         </div>
 
         {/* Tab Switcher */}
-        <div className="flex px-6 gap-2">
+        <div className="flex px-4 sm:px-6 gap-2">
             {[
                 { id: 'seller', label: 'Partner', icon: LogIn },
                 { id: 'register', label: 'Enroll', icon: UserPlus },
@@ -151,19 +151,19 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                     key={tab.id}
                     onClick={() => { setActiveTab(tab.id as any); setError(''); }}
                     className={cn(
-                        "flex-1 flex flex-col items-center gap-1 py-3 rounded-xl transition-all duration-300 border-2 cursor-pointer",
+                        "flex-1 flex flex-col items-center gap-1 py-2.5 sm:py-3 rounded-xl transition-all duration-300 border-2 cursor-pointer",
                         activeTab === tab.id 
                             ? "bg-slate-900 border-slate-900 text-white shadow-md" 
                             : "bg-slate-50 border-transparent text-slate-400 hover:bg-slate-100"
                     )}
                 >
                     <tab.icon className={cn("w-4 h-4", activeTab === tab.id ? "text-brand" : "text-slate-300")} />
-                    <span className="text-[9px] font-black uppercase tracking-wider">{tab.label}</span>
+                    <span className="text-[8.5px] sm:text-[9px] font-black uppercase tracking-wider">{tab.label}</span>
                 </button>
             ))}
         </div>
 
-        <div className="p-8 pt-6">
+        <div className="p-5 sm:p-8 pt-5 sm:pt-6">
             <AnimatePresence mode="wait">
                 {activeTab === 'admin' && (
                     <form onSubmit={handleAdminLogin} className="space-y-4">
@@ -176,7 +176,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                                     onChange={(e) => setPassword(e.target.value)}
                                     placeholder="Root Password"
                                     required
-                                    className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-brand focus:border-transparent outline-none transition-all font-mono"
+                                    className="w-full px-4 sm:px-5 py-3.5 sm:py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-brand focus:border-transparent outline-none transition-all font-mono text-xs sm:text-sm"
                                 />
                                 <button
                                     type="button"
@@ -196,13 +196,13 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                                 onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
                                 placeholder="••••"
                                 required
-                                className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-brand focus:border-transparent outline-none transition-all font-mono text-center tracking-[1em]"
+                                className="w-full px-4 sm:px-5 py-3.5 sm:py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-brand focus:border-transparent outline-none transition-all font-mono text-center tracking-[1em] text-sm"
                             />
                         </div>
-                        {error && <p className="text-rose-500 text-[10px] font-black uppercase tracking-wider text-center bg-rose-50 p-2 rounded-lg">{error}</p>}
+                        {error && <p className="text-rose-500 text-[10px] font-black uppercase tracking-wider text-center bg-rose-50 p-2.5 rounded-xl">{error}</p>}
                         <button
                             type="submit"
-                            className="w-full py-4 bg-slate-900 text-brand rounded-2xl font-black uppercase tracking-[0.2em] shadow-lg shadow-brand/10 hover:bg-black transition-all group flex items-center justify-center gap-2 cursor-pointer"
+                            className="w-full py-3.5 sm:py-4 bg-slate-900 text-brand rounded-2xl font-black uppercase tracking-[0.2em] shadow-lg shadow-brand/10 hover:bg-black transition-all group flex items-center justify-center gap-2 cursor-pointer text-xs"
                         >
                             Execute Login
                             <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
@@ -220,7 +220,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                                 onChange={(e) => setSellerIdInput(e.target.value)}
                                 placeholder="e.g. trendy_bd_01"
                                 required
-                                className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-brand focus:border-transparent outline-none transition-all font-black uppercase tracking-widest text-[#6366f1]"
+                                className="w-full px-4 sm:px-5 py-3.5 sm:py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-brand focus:border-transparent outline-none transition-all font-black uppercase tracking-widest text-[#6366f1] text-xs sm:text-sm"
                             />
                         </div>
                         <div className="space-y-1.5">
@@ -232,27 +232,27 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                                 onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
                                 placeholder="••••"
                                 required
-                                className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-brand focus:border-transparent outline-none transition-all font-mono text-center tracking-[1em]"
+                                className="w-full px-4 sm:px-5 py-3.5 sm:py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-brand focus:border-transparent outline-none transition-all font-mono text-center tracking-[1em] text-sm"
                             />
                         </div>
-                        {error && <p className="text-rose-500 text-[10px] font-black uppercase tracking-wider text-center bg-rose-50 p-2 rounded-lg">{error}</p>}
+                        {error && <p className="text-rose-500 text-[10px] font-black uppercase tracking-wider text-center bg-rose-50 p-2.5 rounded-xl">{error}</p>}
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full py-4 bg-slate-900 text-brand rounded-2xl font-black uppercase tracking-[0.2em] shadow-lg shadow-brand/10 hover:bg-black transition-all group flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                            className="w-full py-3.5 sm:py-4 bg-slate-900 text-brand rounded-2xl font-black uppercase tracking-[0.2em] shadow-lg shadow-brand/10 hover:bg-black transition-all group flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer text-xs"
                         >
                             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Access Dashboard"}
                             {!loading && <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />}
                         </button>
-                        <p className="text-[10px] text-center text-slate-400 font-bold uppercase tracking-tight px-4">
+                        <p className="text-[9px] sm:text-[10px] text-center text-slate-400 font-bold uppercase tracking-tight px-2">
                             Sellers must be pre-registered or authorized by admin to gain catalog access.
                         </p>
                     </form>
                 )}
 
                 {activeTab === 'register' && (
-                    <form onSubmit={handleRegister} className="space-y-4 scrollbar-none overflow-y-auto max-h-[350px] pr-1">
-                        <div className="space-y-4">
+                    <form onSubmit={handleRegister} className="space-y-4 scrollbar-none overflow-y-auto max-h-[60vh] sm:max-h-[380px] pr-1">
+                        <div className="space-y-3.5">
                             <div className="space-y-1.5">
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Store / Partner Name</label>
                                 <input
@@ -261,7 +261,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                                     value={regData.name}
                                     onChange={e => setRegData({...regData, name: e.target.value})}
                                     placeholder="Enter shop name"
-                                    className="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-bold uppercase tracking-tight outline-none focus:border-brand"
+                                    className="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm font-bold uppercase tracking-tight outline-none focus:border-brand"
                                 />
                             </div>
                             <div className="space-y-1.5">
@@ -272,7 +272,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                                     value={regData.owner_name}
                                     onChange={e => setRegData({...regData, owner_name: e.target.value})}
                                     placeholder="Enter owner name"
-                                    className="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-bold uppercase tracking-tight outline-none focus:border-brand"
+                                    className="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm font-bold uppercase tracking-tight outline-none focus:border-brand"
                                 />
                             </div>
                             <div className="space-y-1.5">
@@ -283,7 +283,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                                     value={regData.shop_address}
                                     onChange={e => setRegData({...regData, shop_address: e.target.value})}
                                     placeholder="Enter shop address"
-                                    className="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-bold uppercase tracking-tight outline-none focus:border-brand"
+                                    className="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm font-bold uppercase tracking-tight outline-none focus:border-brand"
                                 />
                             </div>
                             <div className="space-y-1.5">
@@ -292,7 +292,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                                     required
                                     value={regData.role}
                                     onChange={e => setRegData({...regData, role: e.target.value as any})}
-                                    className="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-bold uppercase tracking-tight outline-none focus:border-brand"
+                                    className="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm font-bold uppercase tracking-tight outline-none focus:border-brand"
                                 >
                                     <option value="product_seller">Product Seller</option>
                                     <option value="food_seller">Food Seller</option>
@@ -307,7 +307,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                                     value={regData.pin}
                                     onChange={e => setRegData({...regData, pin: e.target.value.replace(/\D/g, '')})}
                                     placeholder="••••"
-                                    className="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-black uppercase tracking-widest text-indigo-600 outline-none focus:border-brand text-center"
+                                    className="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-black uppercase tracking-widest text-indigo-600 outline-none focus:border-brand text-center tracking-[0.5em]"
                                 />
                             </div>
                             <div className="space-y-1.5">
@@ -318,7 +318,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                                     value={regData.seller_id}
                                     onChange={e => setRegData({...regData, seller_id: e.target.value.replace(/\s+/g, '_').toLowerCase()})}
                                     placeholder="e.g. fashion_hub"
-                                    className="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-black uppercase tracking-widest text-indigo-600 outline-none focus:border-brand"
+                                    className="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm font-black uppercase tracking-widest text-indigo-600 outline-none focus:border-brand"
                                 />
                                 <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wider pl-1">This will be your permanent login key</p>
                             </div>
@@ -332,7 +332,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                                         value={regData.whatsapp_number}
                                         onChange={e => setRegData({...regData, whatsapp_number: e.target.value})}
                                         placeholder="017xxxxxxxx"
-                                        className="w-full pl-10 pr-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-bold outline-none focus:border-brand"
+                                        className="w-full pl-10 pr-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm font-bold outline-none focus:border-brand"
                                     />
                                 </div>
                             </div>
@@ -343,7 +343,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                                     value={regData.facebook}
                                     onChange={e => setRegData({...regData, facebook: e.target.value})}
                                     placeholder="facebook.com/..."
-                                    className="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-bold outline-none focus:border-brand"
+                                    className="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm font-bold outline-none focus:border-brand"
                                 />
                             </div>
                             <div className="space-y-1.5">
@@ -353,7 +353,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                                     value={regData.instagram}
                                     onChange={e => setRegData({...regData, instagram: e.target.value})}
                                     placeholder="instagram.com/..."
-                                    className="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-bold outline-none focus:border-brand"
+                                    className="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm font-bold outline-none focus:border-brand"
                                 />
                             </div>
                             <div className="space-y-1.5 pt-2">
@@ -372,7 +372,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-[0.2em] shadow-lg hover:bg-black transition-all group flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                            className="w-full py-3.5 sm:py-4 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-[0.2em] shadow-lg hover:bg-black transition-all group flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer text-xs"
                         >
                             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Request Enrollment"}
                             {!loading && <ChevronRight className="w-4 h-4" />}
