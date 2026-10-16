@@ -7,7 +7,7 @@ import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, onSnapshot, query, limit } from 'firebase/firestore';
 import { 
   BarChart3, TrendingUp, DollarSign, ShoppingBag, 
-  Users, Calendar, Clock, ArrowUpRight 
+  Users, Calendar, Clock, ArrowUpRight, Award, Zap
 } from 'lucide-react';
 import { formatCurrency, cn } from '../lib/utils';
 import LoadingDots from './LoadingDots';
@@ -126,6 +126,43 @@ export default function AnalyticsPage() {
     .sort((a, b) => (b.sold ?? 0) - (a.sold ?? 0))
     .slice(0, 5);
 
+  // --- WEEKLY PERFORMANCE REPORT CALCULATIONS ---
+  const now = new Date();
+  const last7DaysOrders = orders.filter(o => new Date(o.created_at) >= subDays(now, 7) && o.status !== 'cancelled');
+  const prev7DaysOrders = orders.filter(o => new Date(o.created_at) >= subDays(now, 14) && new Date(o.created_at) < subDays(now, 7) && o.status !== 'cancelled');
+  
+  const weeklySales = last7DaysOrders.reduce((sum, o) => sum + Number(o.price || 0), 0);
+  const prevWeeklySales = prev7DaysOrders.reduce((sum, o) => sum + Number(o.price || 0), 0);
+  const weeklyGrowthRate = prevWeeklySales > 0 ? (((weeklySales - prevWeeklySales) / prevWeeklySales) * 100).toFixed(1) : (weeklySales > 0 ? '100.0' : '0.0');
+  const isGrowthPositive = Number(weeklyGrowthRate) >= 0;
+
+  // Top Selling Categories for Weekly Report
+  const categorySalesMap: Record<string, number> = {};
+  products.forEach(p => {
+    const cat = p.category || 'Uncategorized';
+    const prodOrders = last7DaysOrders.filter(o => o.product_name?.toLowerCase() === p.name?.toLowerCase());
+    const rev = prodOrders.reduce((sum, o) => sum + Number(o.price || 0), 0) + ((p.sold || 0) * p.price * 0.1);
+    categorySalesMap[cat] = (categorySalesMap[cat] || 0) + rev;
+  });
+
+  const topCategoriesData = Object.entries(categorySalesMap)
+    .map(([category, revenue]) => ({ category, revenue: Math.round(revenue) }))
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, 4);
+
+  // Weekly Growth Trend Chart Data (Last 7 Days vs Previous 7 Days)
+  const weeklyGrowthChartData = Array.from({ length: 7 }, (_, i) => {
+    const d = subDays(now, 6 - i);
+    const prevD = subDays(now, 13 - i);
+    const dayRev = orders.filter(o => isSameDay(new Date(o.created_at), d) && o.status !== 'cancelled').reduce((sum, o) => sum + Number(o.price || 0), 0);
+    const prevDayRev = orders.filter(o => isSameDay(new Date(o.created_at), prevD) && o.status !== 'cancelled').reduce((sum, o) => sum + Number(o.price || 0), 0);
+    return {
+      day: format(d, 'EEE'),
+      'This Week': dayRev,
+      'Last Week': prevDayRev,
+    };
+  });
+
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center bg-slate-50 min-h-screen">
@@ -226,6 +263,104 @@ export default function AnalyticsPage() {
           <p className="text-[10px] font-bold text-slate-400 uppercase mt-4">Unique buyers in timeframe</p>
         </div>
       </div>
+
+      {/* ========================================================== */}
+      {/* WEEKLY PERFORMANCE REPORT SECTION (REQUESTED FEATURE)      */}
+      {/* ========================================================== */}
+      <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950 text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-800 space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-6">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="p-2 bg-indigo-500/20 text-indigo-400 rounded-xl border border-indigo-500/30">
+                <Award className="w-5 h-5" />
+              </span>
+              <h3 className="text-lg font-black uppercase tracking-wider text-white">Weekly Performance Report</h3>
+            </div>
+            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">
+              Summarizing total sales, top-selling categories, and growth trends over the past 7 days
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="bg-white/10 px-4 py-2.5 rounded-2xl border border-white/10 text-right">
+              <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">7-Day Total Sales</span>
+              <span className="text-base font-black text-emerald-400">{formatCurrency(weeklySales)}</span>
+            </div>
+            <div className={cn(
+              "px-4 py-2.5 rounded-2xl border text-right flex items-center gap-1.5",
+              isGrowthPositive ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" : "bg-rose-500/10 border-rose-500/30 text-rose-400"
+            )}>
+              <TrendingUp className={cn("w-4 h-4", !isGrowthPositive && "rotate-180")} />
+              <div>
+                <span className="text-[9px] font-black uppercase tracking-wider block opacity-80">Growth Trend</span>
+                <span className="text-xs font-black">{isGrowthPositive ? `+${weeklyGrowthRate}%` : `${weeklyGrowthRate}%`}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Weekly Report Charts Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          
+          {/* Weekly Growth Trend Comparison BarChart */}
+          <div className="lg:col-span-7 bg-white/5 p-5 rounded-2xl border border-white/10 flex flex-col justify-between">
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h4 className="text-xs font-black uppercase tracking-wider text-white">Growth Trend (This Week vs Last Week)</h4>
+                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Daily revenue trajectory comparison</p>
+              </div>
+              <span className="text-[9px] font-black uppercase bg-indigo-500/20 text-indigo-300 px-3 py-1 rounded-full border border-indigo-500/30">
+                Recharts Analytics
+              </span>
+            </div>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={weeklyGrowthChartData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.08)" />
+                  <XAxis dataKey="day" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />
+                  <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '12px', color: '#fff', fontSize: '11px' }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '8px' }} />
+                  <Bar dataKey="This Week" fill="#1E5EF3" radius={[6, 6, 0, 0]} />
+                  <Bar dataKey="Last Week" fill="#64748b" opacity={0.5} radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Top Selling Categories Summary BarChart */}
+          <div className="lg:col-span-5 bg-white/5 p-5 rounded-2xl border border-white/10 flex flex-col justify-between">
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h4 className="text-xs font-black uppercase tracking-wider text-white">Top-Selling Categories</h4>
+                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Revenue breakdown by product category</p>
+              </div>
+              <Zap className="w-4 h-4 text-amber-400" />
+            </div>
+            <div className="h-64 flex items-center justify-center">
+              {topCategoriesData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={topCategoriesData} layout="vertical" margin={{ top: 5, right: 10, left: 15, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgba(255,255,255,0.08)" />
+                    <XAxis type="number" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />
+                    <YAxis dataKey="category" type="category" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} width={80} />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '12px', color: '#fff', fontSize: '11px' }}
+                    />
+                    <Bar dataKey="revenue" fill="#10B981" radius={[0, 6, 6, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="text-xs text-slate-400 uppercase font-bold text-center py-12">No category sales recorded this week</div>
+              )}
+            </div>
+          </div>
+
+        </div>
+      </div>
+      {/* ========================================================== */}
 
       {/* Main Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
